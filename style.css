@@ -643,6 +643,21 @@ body.screen .hint kbd {
   vertical-align: -2px;
 }
 
+/* on-screen host controls (big screen) */
+.controls {
+  position: fixed;
+  right: 20px;
+  bottom: 16px;
+  display: flex;
+  gap: 10px;
+  z-index: 40;
+  opacity: 0.9;
+}
+.controls button {
+  font-size: 1rem;
+  padding: 0.55em 1em;
+}
+
 /* ===========================================================================
    PLAYER PHONE
    =========================================================================== */

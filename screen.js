@@ -19,7 +19,7 @@ import {
   subscribePlayers,
 } from './db.js'
 import { avatarSVG } from './avatars.js'
-import { sfx, resume as audioResume, toggleMuted } from './audio.js'
+import { sfx, resume as audioResume, toggleMuted, isMuted } from './audio.js'
 
 const app = document.getElementById('app')
 const STORE_KEY = 'www_screen'
@@ -57,8 +57,45 @@ async function init() {
   state.players = await getPlayers(state.room.id)
   subscribe()
   window.addEventListener('keydown', onKey)
+  buildControls()
   await onEnterPhase()
   render()
+}
+
+// Persistent on-screen control bar (mirrors the Space / A / M keys) — useful on
+// touchscreens and for automated testing.
+function buildControls() {
+  const bar = document.createElement('div')
+  bar.className = 'controls'
+  bar.innerHTML = `
+    <button id="c-next" title="Advance (Space)">Next ▶</button>
+    <button id="c-auto" class="ghost" title="Toggle auto-advance (A)">Auto: off</button>
+    <button id="c-mute" class="ghost" title="Mute (M)">🔊</button>`
+  document.body.appendChild(bar)
+  bar.querySelector('#c-next').onclick = () => {
+    audioResume()
+    advance()
+  }
+  bar.querySelector('#c-auto').onclick = () => {
+    audioResume()
+    state.autoAdvance = !state.autoAdvance
+    updateControls()
+    maybeAutoAdvance()
+    render()
+  }
+  bar.querySelector('#c-mute').onclick = () => {
+    audioResume()
+    toggleMuted()
+    updateControls()
+  }
+  updateControls()
+}
+
+function updateControls() {
+  const a = document.getElementById('c-auto')
+  if (a) a.textContent = 'Auto: ' + (state.autoAdvance ? 'on' : 'off')
+  const m = document.getElementById('c-mute')
+  if (m) m.textContent = isMuted() ? '🔇' : '🔊'
 }
 
 function subscribe() {
@@ -105,9 +142,11 @@ function onKey(e) {
     advance()
   } else if (e.code === 'KeyM') {
     flash('Sound ' + (toggleMuted() ? 'muted' : 'on'))
+    updateControls()
   } else if (e.code === 'KeyA') {
     state.autoAdvance = !state.autoAdvance
     flash('Auto-advance ' + (state.autoAdvance ? 'ON' : 'OFF'))
+    updateControls()
     maybeAutoAdvance()
     render()
   }

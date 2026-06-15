@@ -31,7 +31,10 @@ import { avatarSVG } from './avatars.js'
 import { sfx, resume as audioResume } from './audio.js'
 
 const app = document.getElementById('app')
-const STORE_KEY = 'www_player'
+// Per-tab storage namespace. Add ?seat=2 (any value) to run a second independent
+// player in the same browser — handy for testing/demoing multiple seats at once.
+const SEAT = new URLSearchParams(location.search).get('seat')
+const STORE_KEY = 'www_player' + (SEAT ? '_' + SEAT : '')
 
 const state = {
   room: null,
