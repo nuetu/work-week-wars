@@ -1,0 +1,5 @@
+# local Supabase config override (publishable key is public, but keep it out of VCS)
+config.js
+.env
+.DS_Store
+node_modules/

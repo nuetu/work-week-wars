@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Work Week Wars</title>
+    <link rel="icon" href="data:," />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Archivo:wght@600;800&family=Inter:wght@400;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <div class="wrap stack" style="padding-top: 12vh">
+      <div class="center stack">
+        <div class="pill">The Office · 4-Day Week Workshop</div>
+        <h1 style="font-size: 2.6rem">Work Week Wars</h1>
+        <p class="muted">
+          A live classroom game about the four-day work week. Allocate your day,
+          dodge burnout, and find out what happens when Friday disappears.
+        </p>
+      </div>
+
+      <div class="card stack">
+        <h2>📺 Host the big screen</h2>
+        <p class="muted">Open this on the projector. It creates a room and shows the join code.</p>
+        <a class="btn big" href="screen.html" style="display: inline-block; text-decoration: none">
+          Launch big screen →
+        </a>
+      </div>
+
+      <div class="card stack">
+        <h2>📱 Join on your phone</h2>
+        <form id="joinForm" class="stack">
+          <input
+            id="code"
+            type="text"
+            inputmode="latin"
+            autocomplete="off"
+            maxlength="4"
+            placeholder="ROOM CODE"
+            style="text-transform: uppercase; letter-spacing: 0.2em; font-weight: 700"
+          />
+          <button class="big" type="submit">Join game →</button>
+        </form>
+      </div>
+
+      <footer class="foot">2–5 players · Built for a university workshop</footer>
+    </div>
+
+    <script>
+      document.getElementById('joinForm').addEventListener('submit', (e) => {
+        e.preventDefault()
+        const code = document.getElementById('code').value.trim().toUpperCase()
+        const url = code ? `play.html?code=${encodeURIComponent(code)}` : 'play.html'
+        location.href = url
+      })
+    </script>
+  </body>
+</html>

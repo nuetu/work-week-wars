@@ -1,0 +1,16 @@
+# Work Week Wars is static — no build step. Publish the repo root as-is.
+[build]
+  publish = "."
+  command = ""
+
+# Optional pretty URLs matching the spec (/screen and /play).
+# The QR/join-link logic handles both these and the *.html paths.
+[[redirects]]
+  from = "/screen"
+  to = "/screen.html"
+  status = 200
+
+[[redirects]]
+  from = "/play"
+  to = "/play.html"
+  status = 200
