@@ -100,6 +100,12 @@ export async function setLock(playerId, round, locked) {
   if (error) throw error
 }
 
+// Record a player's round-1 burnout so round 2 can apply the carryover.
+export async function setR1Burnout(playerId, burnout) {
+  const { error } = await supabase.from(T.players).update({ r1_burnout: burnout }).eq('id', playerId)
+  if (error) throw error
+}
+
 // Reset the lock flag for everyone in a room (used entering a round).
 export async function resetLocks(roomId, round) {
   const col = round === 1 ? 'locked_r1' : 'locked_r2'

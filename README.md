@@ -116,9 +116,22 @@ logic, which the spec explicitly allows.
 ### Metric model
 
 Each metric starts at **50** for the balanced reference day and moves as weekly hours
-deviate from it, with coefficients whose signs match the spec's influence table. This
-guarantees the calibration target and makes the four‑day week naturally lower burnout —
-the lesson of the workshop. See the comments in `game.js`.
+deviate from it, with coefficients whose signs match the spec's influence table:
 ```
-burnout/stress/wellbeing/productivity = clamp(50 + Σ coeff·(weekly_hoursᵢ − balancedᵢ), 0, 100)
+metric = clamp(50 + Σ coeff·(weekly_hoursᵢ − balancedᵢ) + roundEffects, 0, 100)
 ```
+On top of that linear base, three refinements make it behave more like the real research
+on hours and the four‑day week (see `game.js`):
+
+- **Diminishing returns on deep work** — productivity uses a saturating curve, so each
+  extra focus hour yields less output (and burnout keeps climbing), discouraging grinding.
+- **Round‑2 focus bonus** — each deep‑work hour is ~15% more productive in the four‑day
+  week (less waste, tighter meetings), so a shorter week roughly *maintains* output
+  instead of mechanically losing it.
+- **Round‑2 recovery + carryover** — the extra day off lowers baseline burnout/stress and
+  raises wellbeing (a downward shift, not a cap — you can still burn out by cramming),
+  while a brutal Round 1 carries residual fatigue into Round 2.
+
+Result: a balanced 8h day scores exactly 50 across the board in Round 1, and the same
+shape in the four‑day Round 2 shows lower burnout/stress, higher wellbeing, and roughly
+equal output — the headline finding from real four‑day‑week trials.

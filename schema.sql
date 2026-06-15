@@ -21,6 +21,7 @@ create table if not exists www_players (
   display_name text not null,
   locked_r1    bool not null default false,
   locked_r2    bool not null default false,
+  r1_burnout   float,                       -- round-1 burnout, for the round-2 carryover
   joined_at    timestamptz default now()
 );
 

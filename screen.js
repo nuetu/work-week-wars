@@ -377,6 +377,8 @@ async function computeRound(round) {
   const players = (await getPlayers(state.room.id)).filter((p) => ROLE_ORDER.includes(p.role))
   const schedRows = await getSchedules(state.room.id, round)
   const targets = await getTargets(state.room.id, round)
+  const prior = {}
+  if (round === 2) for (const p of players) prior[p.role] = p.r1_burnout
   const entries = players.map((p) => {
     const s = schedRows.find((row) => row.player_id === p.id)
     return {
@@ -387,7 +389,7 @@ async function computeRound(round) {
       target_per_day: targets[p.role] || 0,
     }
   })
-  return evaluateRound(entries, state.room.meeting_hrs, round)
+  return evaluateRound(entries, state.room.meeting_hrs, round, prior)
 }
 
 function renderSlide() {
@@ -539,6 +541,7 @@ function playerCardHtml(slide) {
           <h3>Weekly schedule</h3>
           <div class="sched-bars">${bars}</div>
           <p class="muted" style="margin-top:14px">${res.summary.label}: <strong style="color:var(--text)">${res.summary.value}</strong></p>
+          ${res.carry > 0 ? `<p class="muted" style="margin-top:6px">🔋 +${Math.round(res.carry)} burnout carried from Round 1</p>` : ''}
         </div>
         <div>
           <h3>Metrics</h3>

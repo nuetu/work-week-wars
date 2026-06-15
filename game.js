@@ -160,7 +160,35 @@ const INFLUENCE = {
   burnout:      { deep:  2.0, meet:  1.0, admin:  1.0, learn:  0.0, rest: -2.0 },
   stress:       { deep:  0.0, meet:  2.0, admin:  1.0, learn:  0.0, rest: -2.0 },
   wellbeing:    { deep:  0.0, meet: -1.0, admin: -1.0, learn:  2.0, rest:  2.0 },
-  productivity: { deep:  3.0, meet: -1.0, admin: -1.0, learn:  1.0, rest:  0.0 },
+  // productivity's deep term is handled by deepProductivity() (diminishing returns),
+  // not this linear coefficient; meet/admin/learn stay linear.
+  productivity: { deep:  0.0, meet: -1.0, admin: -1.0, learn:  1.0, rest:  0.0 },
+}
+
+// --- Realism refinements (see README "Metric model") ---------------------
+// 1. Deep work has DIMINISHING RETURNS for productivity — cramming more focus
+//    hours yields progressively less output (a saturating curve), and past a
+//    point you're just tired, not productive.
+// 2. The 4-day week gets a FOCUS bonus: each deep hour is worth a bit more
+//    (less waste, tighter meetings), so a shorter week roughly matches output.
+// 3. The 4-day week gets a RECOVERY bonus: the extra day off lowers baseline
+//    burnout/stress and raises wellbeing — but the ceiling stays 100, so you
+//    can still burn out by cramming long days.
+const PROD_K = 22 // weekly-deep-hours half-saturation; lower = stronger diminishing returns
+const PROD_GAIN = 10 // scales the (diminished) deep contribution to productivity
+const FOCUS_R2 = 1.15 // each deep hour ~15% more productive in the focused 4-day week
+const RECOVERY_R2 = { burnout: -5, stress: -6, wellbeing: 7, productivity: 0 }
+
+function deepProductivity(deepWeekly, round) {
+  const focus = round === 2 ? FOCUS_R2 : 1
+  return focus * (deepWeekly / (1 + deepWeekly / PROD_K)) // concave / saturating
+}
+const DEEP_PROD0 = deepProductivity(BALANCED_WEEKLY.deep, 1) // R1 balanced reference
+
+// Residual fatigue carried from a hard previous week into round 2.
+export function burnoutCarry(priorBurnout) {
+  if (!priorBurnout) return 0
+  return clamp(0.35 * (priorBurnout - 50), 0, 25)
 }
 
 export function clamp(val, min, max) {
@@ -180,24 +208,34 @@ export function weeklyTotals(schedule, meetingHrsPerDay, round) {
 }
 
 // Compute the four personal metrics from weekly totals.
-export function metricsFromWeekly(w) {
-  const out = {}
-  for (const [metric, coef] of Object.entries(INFLUENCE)) {
-    const dev =
-      coef.deep * (w.deep - BALANCED_WEEKLY.deep) +
-      coef.meet * (w.meet - BALANCED_WEEKLY.meet) +
-      coef.admin * (w.admin - BALANCED_WEEKLY.admin) +
-      coef.learn * (w.learn - BALANCED_WEEKLY.learn) +
-      coef.rest * (w.rest - BALANCED_WEEKLY.rest)
-    out[metric] = Math.round(clamp(50 + dev, 0, 100))
+// opts: { round (1|2), carryBurnout } — round drives the focus/recovery bonuses.
+export function metricsFromWeekly(w, opts = {}) {
+  const round = opts.round || 1
+  const carry = opts.carryBurnout || 0
+  const rec = round === 2 ? RECOVERY_R2 : { burnout: 0, stress: 0, wellbeing: 0, productivity: 0 }
+
+  const dev = (c) =>
+    c.deep * (w.deep - BALANCED_WEEKLY.deep) +
+    c.meet * (w.meet - BALANCED_WEEKLY.meet) +
+    c.admin * (w.admin - BALANCED_WEEKLY.admin) +
+    c.learn * (w.learn - BALANCED_WEEKLY.learn) +
+    c.rest * (w.rest - BALANCED_WEEKLY.rest)
+
+  // Productivity: deep via diminishing returns + round focus bonus; rest linear.
+  const prodDeep = PROD_GAIN * (deepProductivity(w.deep, round) - DEEP_PROD0)
+
+  return {
+    burnout: Math.round(clamp(50 + dev(INFLUENCE.burnout) + rec.burnout + carry, 0, 100)),
+    stress: Math.round(clamp(50 + dev(INFLUENCE.stress) + rec.stress, 0, 100)),
+    wellbeing: Math.round(clamp(50 + dev(INFLUENCE.wellbeing) + rec.wellbeing, 0, 100)),
+    productivity: Math.round(clamp(50 + prodDeep + dev(INFLUENCE.productivity) + rec.productivity, 0, 100)),
   }
-  return out
 }
 
 // Convenience: schedule -> { weekly, metrics }.
-export function computePersonal(schedule, meetingHrsPerDay, round) {
+export function computePersonal(schedule, meetingHrsPerDay, round, carryBurnout = 0) {
   const weekly = weeklyTotals(schedule, meetingHrsPerDay, round)
-  return { weekly, metrics: metricsFromWeekly(weekly) }
+  return { weekly, metrics: metricsFromWeekly(weekly, { round, carryBurnout }) }
 }
 
 // ---------------------------------------------------------------------------
@@ -207,18 +245,21 @@ export function computePersonal(schedule, meetingHrsPerDay, round) {
 // entries: [{ role, schedule, target_per_day }], meetingHrsPerDay, round
 // Returns per-player results plus team & company numbers, and win/fail.
 
-export function evaluateRound(entries, meetingHrsPerDay, round) {
+// priorBurnout: { role: round-1 burnout } — drives the round-2 carryover. Omit for round 1.
+export function evaluateRound(entries, meetingHrsPerDay, round, priorBurnout = {}) {
   const days = daysInRound(round)
 
   // First pass: personal metrics + weekly totals.
   const results = entries.map((e) => {
-    const { weekly, metrics } = computePersonal(e.schedule, meetingHrsPerDay, round)
+    const carry = round === 2 ? burnoutCarry(priorBurnout[e.role]) : 0
+    const { weekly, metrics } = computePersonal(e.schedule, meetingHrsPerDay, round, carry)
     return {
       role: e.role,
       schedule: e.schedule,
       target_weekly: (e.target_per_day || 0) * days,
       weekly,
       metrics,
+      carry,
     }
   })
 

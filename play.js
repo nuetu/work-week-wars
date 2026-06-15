@@ -10,6 +10,7 @@ import {
   daysInRound,
   computePersonal,
   evaluateRound,
+  burnoutCarry,
 } from './game.js'
 import {
   getRoomByCode,
@@ -17,6 +18,7 @@ import {
   joinRoom,
   getPlayers,
   setLock,
+  setR1Burnout,
   saveSchedule,
   getSchedules,
   saveTargets,
@@ -456,7 +458,8 @@ function renderAllocating() {
     leftEl.textContent = left.toFixed(1) + 'h'
     document.getElementById('budget').classList.toggle('over', left < -1e-9)
 
-    const { metrics } = computePersonal(state.draft, meeting, round)
+    const carry = round === 2 ? burnoutCarry(state.player.r1_burnout) : 0
+    const { metrics } = computePersonal(state.draft, meeting, round, carry)
     METRICS.forEach((m) => {
       const v = metrics[m.key]
       gaugeWrap.querySelector(`[data-g="${m.key}"]`).textContent = v
@@ -476,6 +479,12 @@ function renderAllocating() {
     setBusy('lock', true)
     try {
       await saveSchedule(state.player.id, round, state.draft)
+      if (round === 1) {
+        // Stash round-1 burnout so round 2 can apply the carryover.
+        const r1b = computePersonal(state.draft, meeting, 1).metrics.burnout
+        state.player.r1_burnout = r1b
+        await setR1Burnout(state.player.id, r1b)
+      }
       await setLock(state.player.id, round, true)
       state.locked = true
       render()
@@ -526,6 +535,8 @@ async function computeRound(round) {
   const players = state.players.filter((p) => ROLE_ORDER.includes(p.role))
   const schedRows = await getSchedules(state.room.id, round)
   const targets = await getTargets(state.room.id, round)
+  const prior = {}
+  if (round === 2) for (const p of players) prior[p.role] = p.r1_burnout
   const entries = players.map((p) => {
     const s = schedRows.find((row) => row.player_id === p.id)
     return {
@@ -541,7 +552,7 @@ async function computeRound(round) {
       target_per_day: targets[p.role] || 0,
     }
   })
-  return evaluateRound(entries, state.room.meeting_hrs, round)
+  return evaluateRound(entries, state.room.meeting_hrs, round, prior)
 }
 
 async function renderResult(round) {
@@ -565,6 +576,7 @@ async function renderResult(round) {
         <div class="title muted">${r.title}</div>
         <div><span class="badge ${me.win ? 'win' : 'fail'}">${me.win ? '✓ Goal met' : '✗ Goal missed'}</span></div>
         <div class="pill">${me.summary.label}: ${me.summary.value}</div>
+        ${me.carry > 0 ? `<div class="muted">🔋 +${Math.round(me.carry)} burnout carried from Round 1</div>` : ''}
       </div>
       <div class="card">
         <div class="gauges" id="g"></div>
