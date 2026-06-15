@@ -264,9 +264,6 @@ input[type='range'] {
   padding: 12px 16px;
   border-radius: 12px;
   background: var(--panel-2);
-  position: sticky;
-  top: 8px;
-  z-index: 5;
 }
 .budget .left-hrs {
   font-family: 'Archivo', sans-serif;
@@ -598,9 +595,13 @@ body.screen .hint kbd {
 }
 .compare-metric {
   display: grid;
-  grid-template-columns: 90px 1fr;
-  gap: 10px;
+  grid-template-columns: 120px 1fr;
+  gap: 12px;
   align-items: center;
+}
+.compare-metric > .muted {
+  white-space: nowrap;
+  font-size: 0.85rem;
 }
 .cmp-bars {
   display: grid;

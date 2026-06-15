@@ -98,9 +98,11 @@ async function resume(saved) {
   if (!me) throw new Error('player gone')
   state.players = players
   state.player = me
-  state.locked = state.room.round === 1 ? me.locked_r1 : me.locked_r2
   subscribe()
   await onEnterPhase()
+  // After onEnterPhase (which assumes a fresh round), restore the real lock flag
+  // so a player who reloads mid-wait still sees the "locked in" screen.
+  state.locked = state.room.round === 1 ? state.player.locked_r1 : state.player.locked_r2
   render()
 }
 
@@ -200,17 +202,23 @@ function subscribe() {
 
 // Runs once whenever we land on a new phase.
 async function onEnterPhase() {
+  const phase = state.room.phase
+  // Reset synchronously, BEFORE any await, so a re-render triggered mid-await (e.g.
+  // by a players realtime event from resetLocks) can't briefly show a stale "locked"
+  // state. Arriving at an allocation phase via a transition is always a fresh round.
+  // (resume() restores the real flag afterwards for page reloads.)
+  if (phase === 'allocating' || phase === 'round2_allocating') {
+    state.draft = blankDraft()
+    state.locked = false
+  }
+
   state.players = await getPlayers(state.room.id)
   const me = state.players.find((p) => p.id === state.player.id)
   if (me) state.player = me
 
-  const phase = state.room.phase
   if (phase === 'allocating' || phase === 'round2_allocating') {
-    state.draft = blankDraft()
-    state.locked = state.room.round === 1 ? state.player.locked_r1 : state.player.locked_r2
     state.targets = await getTargets(state.room.id, state.room.round)
-  }
-  if (phase === 'michael_sets' || phase === 'round2_setup') {
+  } else if (phase === 'michael_sets' || phase === 'round2_setup') {
     // Round-1 targets act as defaults (round 1) and as the can-only-reduce caps (round 2).
     state.targets = await getTargets(state.room.id, 1)
   }

@@ -17,9 +17,11 @@ export const ROLES = {
     goal: 'Feel in control — your meetings must happen.',
     weakness: 'Too many meetings tank team productivity and morale.',
     // metrics: company-level; schedule: this player's weekly hours
-    win: (m, s) => s.meet >= 6 && m.company_productivity >= 60,
+    // Per-day so it scales with the round: ≥1.2h/day = 6h in R1, 4.8h in R2.
+    // (A fixed weekly 6h would trap Michael in R2, where he can only reduce.)
+    win: (m, s) => s.meet / s.days >= 1.2 && m.company_productivity >= 60,
     // Friendly description of the bar to clear, shown on cards.
-    target: 'Weekly meetings ≥ 6h  &  company productivity ≥ 60',
+    target: 'Meetings ≥ 1.2h/day  &  company productivity ≥ 60',
   },
   dwight: {
     name: 'Dwight Schrute',
@@ -259,7 +261,7 @@ export function evaluateRound(entries, meetingHrsPerDay, round) {
       team_burnout,
       team_wellbeing,
     }
-    const sched = { ...r.weekly, target_weekly: r.target_weekly }
+    const sched = { ...r.weekly, target_weekly: r.target_weekly, days }
     r.win = !!ROLES[r.role].win(ctx, sched)
     r.summary = roleSummary(r, company)
   }
