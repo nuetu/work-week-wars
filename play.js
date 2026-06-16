@@ -11,6 +11,9 @@ import {
   computePersonal,
   evaluateRound,
   burnoutCarry,
+  teamVerdict,
+  TEAM_GOAL,
+  ROUND_INTRO,
 } from './game.js'
 import {
   getRoomByCode,
@@ -262,11 +265,23 @@ function renderPhase() {
 // lobby — role card
 // ---------------------------------------------------------------------------
 
+// The shared team goal — shown on every role card so the co-op objective leads.
+function teamGoalHTML() {
+  return `
+    <div class="team-goal-card">
+      <div class="tg-title">🎯 Team goal: ${TEAM_GOAL.title}</div>
+      <div class="tg-line">${TEAM_GOAL.output} ${TEAM_GOAL.wellbeing}</div>
+      <div class="tg-sub">You win or lose <strong>as a team</strong>.</div>
+    </div>`
+}
+
 // Shared role explainer used on the lobby card, the "Michael is setting up" page,
-// and the in-game "ℹ️ Role" overlay.
+// and the in-game "ℹ️ Role" overlay. Leads with the team goal, then this role's
+// job on the team and its personal medal (flavour — never overrides the team result).
 function roleCardHTML(role) {
   const r = ROLES[role]
   return `
+    ${teamGoalHTML()}
     <div class="card stack role-${role}">
       <div class="role-head">
         <div class="avatar role-${role}">${avatarSVG(role)}</div>
@@ -275,9 +290,9 @@ function roleCardHTML(role) {
           <div class="title">${r.title}</div>
         </div>
       </div>
-      <p><strong>🎯 Your goal.</strong> ${r.goal}</p>
+      <p><strong>🧩 Your job.</strong> ${r.job}</p>
       <p><strong>⚠️ Watch out for.</strong> ${r.weakness}</p>
-      <p class="target-note"><strong>✅ To win:</strong> ${r.target}</p>
+      <p class="target-note"><strong>🏅 ${r.medalLabel} (personal):</strong> ${r.target}</p>
     </div>`
 }
 
@@ -290,12 +305,17 @@ function renderLobby() {
     </div>`
 }
 
-// Shown to non-Michael players while Michael sets up (both rounds): re-introduce
-// the role and goal so the wait is useful.
+// Shown to non-Michael players while Michael sets up (both rounds): the round's
+// story intro, then the team goal + this player's role, so the wait is useful.
 function renderRolePage(footerMsg) {
+  const intro = ROUND_INTRO[state.room.round] || ROUND_INTRO[1]
   app.innerHTML = `
-    <div class="stack" style="padding-top:4vh">
-      <div class="center"><div class="pill">Get to know your role</div></div>
+    <div class="stack" style="padding-top:3vh">
+      <div class="card stack intro-card">
+        <div class="pill">${intro.pill}</div>
+        <h2 style="margin:.2em 0">${intro.title}</h2>
+        <p class="muted" style="font-size:.95rem;line-height:1.5">${intro.body}</p>
+      </div>
       ${roleCardHTML(state.player.role)}
       <div class="center muted">${footerMsg}<span class="dots"></span></div>
     </div>`
@@ -315,11 +335,13 @@ function renderMichaelSetup(isRound2) {
     <div class="stack">
       <div class="center"><div class="pill">${isRound2 ? 'Round 2 · 32-hour week' : 'Round 1 · 40-hour week'}</div></div>
       <h2>${isRound2 ? 'Trim the schedule' : 'Set the schedule'}</h2>
+      ${teamGoalHTML()}
       <p class="muted">
+        <strong>🧩 Your job.</strong> ${ROLES.michael.job}
         ${
           isRound2
-            ? 'Friday is gone. You may only reduce meetings and targets — not raise them.'
-            : 'Your meeting hours apply to everyone, every day, and are deducted before anyone allocates.'
+            ? ' Friday is gone — you may only <em>reduce</em> meetings and targets, not raise them.'
+            : ' Your meeting hours apply to everyone, every day, and are deducted before anyone allocates.'
         }
       </p>
 
@@ -424,9 +446,11 @@ function renderAllocating() {
       ${myTarget != null && myTarget > 0
         ? `<div class="target-note">📣 Michael expects <strong>${myTarget.toFixed(1)}h/day</strong> of deep work from you (${(myTarget * days).toFixed(1)}h/week).</div>`
         : ''}
-      <div class="target-note" style="background:var(--panel-2);border-color:var(--line)"><strong>Win:</strong> ${r.target}</div>
+      <div class="target-note" style="background:var(--panel-2);border-color:var(--line)">
+        <strong>🎯 Team:</strong> deliver the orders without burning out. <strong>🏅 You:</strong> ${r.target}
+      </div>
 
-      <div class="stack" id="sliders"></div>
+      <div class="stack" id="steppers"></div>
 
       <div class="card stack">
         <h3 style="margin:0">Your week at a glance</h3>
@@ -436,18 +460,23 @@ function renderAllocating() {
       <button id="lock" class="big" disabled>Lock in my week</button>
     </div>`
 
-  const sliderWrap = document.getElementById('sliders')
+  // +/- steppers (one per category) — nicer than sliders on a phone.
+  const stepWrap = document.getElementById('steppers')
   CATEGORIES.forEach((c) => {
     const row = document.createElement('div')
-    row.className = 'slider-row'
+    row.className = 'stepper-row'
     row.innerHTML = `
-      <div class="slider-top">
+      <div class="stepper-top">
         <span class="slider-label">${c.emoji} ${c.label}</span>
         <span class="slider-hrs" data-out="${c.key}">0.0h</span>
       </div>
-      <input type="range" data-key="${c.key}" min="0" max="${budget}" step="${SLIDER_STEP}" value="0" />
+      <div class="stepper">
+        <button type="button" class="step-btn" data-dir="-1" data-key="${c.key}" aria-label="Less ${c.label}">−</button>
+        <div class="step-bar"><div class="step-fill" data-bar="${c.key}"></div></div>
+        <button type="button" class="step-btn" data-dir="1" data-key="${c.key}" aria-label="More ${c.label}">+</button>
+      </div>
       <div class="slider-desc">${c.desc}</div>`
-    sliderWrap.appendChild(row)
+    stepWrap.appendChild(row)
   })
 
   const gaugeWrap = document.getElementById('gauges')
@@ -460,26 +489,25 @@ function renderAllocating() {
     gaugeWrap.appendChild(g)
   })
 
-  const inputs = [...sliderWrap.querySelectorAll('input[type=range]')]
   const lockBtn = document.getElementById('lock')
+  const catTotal = () => CATEGORIES.reduce((s, c) => s + (state.draft[c.key] || 0), 0)
 
-  const recompute = (changed) => {
-    // clamp total to budget by trimming the slider just moved
-    let total = inputs.reduce((s, i) => s + parseFloat(i.value), 0)
-    if (total > budget + 1e-9 && changed) {
-      const others = total - parseFloat(changed.value)
-      changed.value = Math.max(0, budget - others)
-      total = inputs.reduce((s, i) => s + parseFloat(i.value), 0)
-    }
-    inputs.forEach((i) => {
-      state.draft[i.dataset.key] = parseFloat(i.value)
-      sliderWrap.querySelector(`[data-out="${i.dataset.key}"]`).textContent =
-        parseFloat(i.value).toFixed(1) + 'h'
-    })
+  const recompute = () => {
+    const total = catTotal()
     const left = budget - total
-    const leftEl = document.getElementById('left')
-    leftEl.textContent = left.toFixed(1) + 'h'
-    document.getElementById('budget').classList.toggle('over', left < -1e-9)
+    CATEGORIES.forEach((c) => {
+      const v = state.draft[c.key] || 0
+      stepWrap.querySelector(`[data-out="${c.key}"]`).textContent = v.toFixed(1) + 'h'
+      stepWrap.querySelector(`[data-bar="${c.key}"]`).style.width =
+        budget > 0 ? Math.min(100, (v / budget) * 100) + '%' : '0%'
+    })
+    // Enable/disable each button: no negative hours, never exceed the budget.
+    stepWrap.querySelectorAll('.step-btn').forEach((btn) => {
+      const v = state.draft[btn.dataset.key] || 0
+      btn.disabled = btn.dataset.dir === '-1' ? v <= 0 : left < SLIDER_STEP - 1e-9
+    })
+    document.getElementById('left').textContent = left.toFixed(1) + 'h'
+    document.getElementById('budget').classList.toggle('low', left < SLIDER_STEP - 1e-9)
 
     const carry = round === 2 ? burnoutCarry(state.player.r1_burnout) : 0
     const { metrics } = computePersonal(state.draft, meeting, round, carry)
@@ -490,11 +518,25 @@ function renderAllocating() {
       fill.style.width = v + '%'
       fill.style.background = gaugeColor(m, v)
     })
-    lockBtn.disabled = total <= 0 || left < -1e-9
+    lockBtn.disabled = total <= 0
   }
 
-  inputs.forEach((i) => i.addEventListener('input', () => recompute(i)))
-  recompute(null)
+  stepWrap.querySelectorAll('.step-btn').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const key = btn.dataset.key
+      const dir = parseFloat(btn.dataset.dir)
+      const cur = state.draft[key] || 0
+      if (dir > 0) {
+        if (catTotal() + SLIDER_STEP > budget + 1e-9) return // no hours left
+        state.draft[key] = cur + SLIDER_STEP
+      } else {
+        state.draft[key] = Math.max(0, cur - SLIDER_STEP)
+      }
+      sfx.tick()
+      recompute()
+    })
+  })
+  recompute()
 
   lockBtn.addEventListener('click', async () => {
     audioResume()
@@ -580,24 +622,29 @@ async function computeRound(round) {
 
 async function renderResult(round) {
   renderWaiting('Tallying the results', '📊')
-  let me, company
+  let me, verdict
   try {
-    const { results, company: co } = await computeRound(round)
-    company = co
+    const { results, company } = await computeRound(round)
     me = results.find((r) => r.role === state.player.role)
+    verdict = teamVerdict(company, 1) // round-1 baseline verdict
   } catch (e) {
     console.error(e)
     return renderWaiting('Waiting for the reveal', '📊')
   }
-  me.win ? sfx.win() : sfx.fail()
+  verdict.win ? sfx.win() : sfx.fail()
   const r = ROLES[state.player.role]
   app.innerHTML = `
     <div class="stack">
+      <div class="team-result ${verdict.win ? 'win' : 'fail'} stack center">
+        <div class="pill">Team result</div>
+        <h2 style="margin:.1em 0">${verdict.win ? '🎉 ' : ''}${verdict.headline}</h2>
+        <p class="muted" style="margin:0">${verdict.detail}</p>
+      </div>
       <div class="result-hero stack role-${state.player.role}">
         <div class="avatar role-${state.player.role}">${avatarSVG(state.player.role)}</div>
         <h2 style="margin:0">${r.name}</h2>
         <div class="title muted">${r.title}</div>
-        <div><span class="badge ${me.win ? 'win' : 'fail'}">${me.win ? '✓ Goal met' : '✗ Goal missed'}</span></div>
+        <div><span class="badge ${me.medal ? 'win' : 'fail'}">${me.medal ? '🏅 ' + r.medalLabel : '— no medal'}</span></div>
         <div class="pill">${me.summary.label}: ${me.summary.value}</div>
         ${me.carry > 0 ? `<div class="muted">🔋 +${Math.round(me.carry)} burnout carried from Round 1</div>` : ''}
       </div>
@@ -632,16 +679,29 @@ async function renderFinal() {
   const a = r1.results.find((x) => x.role === role)
   const b = r2.results.find((x) => x.role === role)
   const r = ROLES[role]
+  const baseline = {
+    output: r1.company.company_output,
+    burnout: r1.company.team_burnout,
+    wellbeing: r1.company.team_wellbeing,
+  }
+  const verdict = teamVerdict(r2.company, 2, baseline)
+  verdict.win ? sfx.win() : sfx.fail()
 
   app.innerHTML = `
     <div class="stack">
+      <div class="team-result ${verdict.win ? 'win' : 'fail'} stack center">
+        <div class="pill">The verdict · 32-hour week</div>
+        <h2 style="margin:.1em 0">${verdict.win ? '🎉 ' : ''}${verdict.headline}</h2>
+        <p class="muted" style="margin:0">${verdict.detail}</p>
+      </div>
       <div class="result-hero stack role-${role}">
         <div class="avatar role-${role}">${avatarSVG(role)}</div>
         <h2 style="margin:0">${r.name}</h2>
         <div class="row" style="display:flex;gap:10px;justify-content:center">
-          <span class="badge ${a.win ? 'win' : 'fail'}">R1 ${a.win ? '✓' : '✗'}</span>
-          <span class="badge ${b.win ? 'win' : 'fail'}">R2 ${b.win ? '✓' : '✗'}</span>
+          <span class="badge ${a.medal ? 'win' : 'fail'}">R1 ${a.medal ? '🏅' : '—'}</span>
+          <span class="badge ${b.medal ? 'win' : 'fail'}">R2 ${b.medal ? '🏅' : '—'}</span>
         </div>
+        <div class="muted">${r.medalLabel}</div>
       </div>
       <div class="card stack">
         <h3 style="margin:0">40-hour week → 32-hour week</h3>
@@ -649,7 +709,7 @@ async function renderFinal() {
       </div>
       <div class="card center stack">
         <h3 style="margin:0">💬 Discuss</h3>
-        <p>What did you cut first — and why?</p>
+        <p>What did you cut first — and would you keep the four-day week?</p>
       </div>
     </div>`
   const cmp = document.getElementById('cmp')

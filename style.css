@@ -754,3 +754,256 @@ footer.foot {
   max-height: 90vh;
   overflow-y: auto;
 }
+
+/* ===========================================================================
+   TEAM MODEL — shared goal banner, steppers, intro, verdict, debrief
+   =========================================================================== */
+
+/* Shared team goal (base — sizing differs per container). */
+.tg-title {
+  font-weight: 800;
+}
+.tg-line {
+  color: var(--muted);
+}
+
+/* Phone: team-goal banner that leads each role card. */
+.team-goal-card {
+  background: color-mix(in srgb, var(--accent) 22%, var(--panel));
+  border: 2px solid var(--accent);
+  border-radius: var(--radius);
+  padding: 14px 16px;
+}
+.team-goal-card .tg-title {
+  font-size: 1.05rem;
+  line-height: 1.35;
+}
+.team-goal-card .tg-line {
+  font-size: 0.92rem;
+  margin-top: 4px;
+}
+.team-goal-card .tg-sub {
+  font-size: 0.85rem;
+  margin-top: 6px;
+  color: var(--text);
+  opacity: 0.85;
+}
+.intro-card {
+  border-color: var(--accent-2);
+}
+
+/* Phone: +/- steppers (replace the allocation sliders). */
+.stepper-row {
+  background: var(--panel-2);
+  border-radius: 14px;
+  padding: 14px 16px;
+}
+.stepper-row .stepper-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 8px;
+}
+.stepper {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.step-btn {
+  flex: 0 0 auto;
+  width: 52px;
+  height: 52px;
+  border-radius: 14px;
+  font-size: 1.8rem;
+  font-weight: 800;
+  line-height: 1;
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+.step-btn:active {
+  transform: scale(0.92);
+}
+.step-btn:disabled {
+  background: var(--panel);
+  color: var(--muted);
+  opacity: 0.55;
+}
+.step-bar {
+  flex: 1 1 auto;
+  height: 12px;
+  border-radius: 999px;
+  background: var(--panel);
+  overflow: hidden;
+}
+.step-fill {
+  height: 100%;
+  width: 0;
+  border-radius: 999px;
+  background: var(--accent-2);
+  transition: width 0.18s ease;
+}
+.budget.low {
+  outline: 2px solid var(--warn);
+}
+
+/* Phone: team result hero on the reveal/final screens. */
+.team-result {
+  border-radius: var(--radius);
+  padding: 18px 16px;
+  text-align: center;
+  border: 2px solid var(--line);
+  background: var(--panel);
+}
+.team-result.win {
+  border-color: var(--good);
+  background: color-mix(in srgb, var(--good) 16%, var(--panel));
+}
+.team-result.fail {
+  border-color: var(--bad);
+  background: color-mix(in srgb, var(--bad) 14%, var(--panel));
+}
+
+/* Big screen: round intro narrative. */
+.intro {
+  max-width: 60ch;
+  margin: 0 auto;
+  text-align: center;
+}
+.intro-title {
+  font-size: clamp(2rem, 5vw, 4rem);
+  margin: 1.5vh 0;
+}
+.intro-body {
+  font-size: 1.5rem;
+  line-height: 1.55;
+  color: var(--text);
+}
+.team-goal {
+  margin: 3vh auto 0;
+  max-width: 56ch;
+  background: color-mix(in srgb, var(--accent) 20%, var(--panel));
+  border: 2px solid var(--accent);
+  border-radius: var(--radius);
+  padding: 18px 22px;
+}
+.team-goal .tg-title {
+  font-size: 1.7rem;
+}
+.team-goal .tg-line {
+  font-size: 1.3rem;
+  margin-top: 6px;
+  color: var(--text);
+  opacity: 0.9;
+}
+
+/* Big screen: company-output orders floor marker. */
+.bigmeter {
+  position: relative;
+}
+.floor-mark {
+  position: absolute;
+  top: -4px;
+  bottom: -4px;
+  width: 3px;
+  background: var(--text);
+  opacity: 0.8;
+  z-index: 2;
+}
+
+/* Big screen: the headline team verdict. */
+.team-verdict {
+  max-width: 60ch;
+  margin: 0 auto;
+  text-align: center;
+  border-radius: var(--radius);
+  padding: 4vh 3vw;
+  border: 3px solid var(--line);
+}
+.team-verdict.win {
+  border-color: var(--good);
+  background: color-mix(in srgb, var(--good) 14%, var(--panel));
+}
+.team-verdict.fail {
+  border-color: var(--bad);
+  background: color-mix(in srgb, var(--bad) 12%, var(--panel));
+}
+.verdict-headline {
+  font-size: clamp(2.2rem, 6vw, 5rem);
+  margin: 1.5vh 0;
+}
+.verdict-headline.win {
+  color: #aef0c4;
+}
+.verdict-headline.fail {
+  color: #ffc2b5;
+}
+.axes {
+  display: grid;
+  gap: 12px;
+  max-width: 46ch;
+  margin: 2vh auto;
+}
+.axis {
+  font-size: 1.4rem;
+  font-weight: 700;
+  padding: 12px 16px;
+  border-radius: 12px;
+  background: var(--panel-2);
+  border-left: 6px solid var(--line);
+}
+.axis.pass {
+  border-left-color: var(--good);
+}
+.axis.fail {
+  border-left-color: var(--bad);
+}
+.verdict-detail {
+  font-size: 1.4rem;
+  color: var(--muted);
+  line-height: 1.5;
+  max-width: 52ch;
+  margin: 2vh auto 0;
+}
+
+/* Big screen: data-driven debrief. */
+.debrief {
+  max-width: 64ch;
+  margin: 0 auto;
+  text-align: center;
+}
+.debrief-stats {
+  display: flex;
+  gap: 18px;
+  justify-content: center;
+  flex-wrap: wrap;
+  margin: 2vh 0;
+}
+.dstat {
+  background: var(--panel-2);
+  border-radius: 14px;
+  padding: 14px 22px;
+  min-width: 220px;
+}
+.dstat .muted {
+  display: block;
+  font-size: 1.1rem;
+  margin-bottom: 4px;
+}
+.delta {
+  font-family: 'Archivo', sans-serif;
+  font-weight: 800;
+  font-size: 1.6rem;
+  font-variant-numeric: tabular-nums;
+}
+.delta.good {
+  color: var(--good);
+}
+.delta.bad {
+  color: var(--bad);
+}

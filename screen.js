@@ -7,6 +7,11 @@ import {
   CATEGORIES,
   daysInRound,
   evaluateRound,
+  teamVerdict,
+  TEAM_GOAL,
+  ROUND_INTRO,
+  OUTPUT_FLOOR,
+  BURNOUT_CAP,
 } from './game.js'
 import {
   createRoom,
@@ -213,7 +218,7 @@ function render() {
     case 'lobby':
       return renderLobby()
     case 'michael_sets':
-      return renderThinking('Michael is planning the week')
+      return renderIntro(1)
     case 'allocating':
     case 'round2_allocating':
       return renderAllocating()
@@ -287,12 +292,22 @@ function renderPlayerSlots() {
 // thinking / waiting
 // ---------------------------------------------------------------------------
 
-function renderThinking(msg) {
+// Round intro narrative (Dunder Mifflin framing) shown on the big screen while
+// Michael sets up. The shared team goal sits underneath so everyone sees it.
+function renderIntro(round) {
+  const intro = ROUND_INTRO[round]
   stage(
-    `<div class="splash">
-      <div class="avatar role-michael">${avatarSVG('michael')}</div>
-      <h1>${msg}<span class="dots"></span></h1>
-      <p class="muted" style="font-size:1.4rem">Setting meeting hours and deep-work targets for the team.</p>
+    `<div class="intro">
+      <div class="pill">${intro.pill}</div>
+      <h1 class="intro-title">${intro.title}</h1>
+      <p class="intro-body">${intro.body}</p>
+      <div class="team-goal">
+        <div class="tg-title">🎯 ${TEAM_GOAL.title}</div>
+        <div class="tg-line">${TEAM_GOAL.output} ${TEAM_GOAL.wellbeing}</div>
+      </div>
+      <p class="muted" style="font-size:1.3rem;margin-top:2vh">${
+        round === 1 ? 'Michael is setting meetings and deep-work targets' : 'Michael is trimming meetings and targets'
+      }<span class="dots"></span></p>
     </div>`,
     'Waiting for Michael…'
   )
@@ -338,15 +353,22 @@ function renderAllocating() {
 // ---------------------------------------------------------------------------
 
 function renderRound2Setup() {
+  const intro = ROUND_INTRO[2]
   const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri']
   const cal = days
     .map((d) => `<div class="day ${d === 'Fri' ? 'struck' : ''}">${d}</div>`)
     .join('')
   stage(
-    `<div class="splash">
-      <h1>Round 2 — the four-day week</h1>
+    `<div class="intro">
+      <div class="pill">${intro.pill}</div>
+      <h1 class="intro-title">${intro.title}</h1>
       <div class="calendar">${cal}</div>
-      <p class="muted" style="font-size:1.5rem">Friday is gone. Michael is trimming meetings and targets…<span class="dots"></span></p>
+      <p class="intro-body">${intro.body}</p>
+      <div class="team-goal">
+        <div class="tg-title">🎯 Beat your 40-hour baseline</div>
+        <div class="tg-line">Hold output at the line, and end up <strong>healthier</strong> than Round 1 — less burnout, more wellbeing.</div>
+      </div>
+      <p class="muted" style="font-size:1.3rem;margin-top:2vh">Michael is trimming meetings and targets<span class="dots"></span></p>
     </div>`,
     'Waiting for Michael…'
   )
@@ -366,11 +388,27 @@ async function buildRevealSlides(round, isFinal) {
     slides.push({ type: 'player', round, result: r, compareTo: isFinal ? evals1.results.find((x) => x.role === r.role) : null })
   }
   slides.push({ type: 'company', round, company: evalRound.company })
+
+  // Team verdict — the headline. R1 = baseline; R2 judged vs the R1 baseline.
+  const baseline = isFinal ? baselineFrom(evals1.company) : null
+  const verdict = teamVerdict(evalRound.company, round, baseline)
+  slides.push({ type: 'team', round, verdict })
+
   if (isFinal) {
     slides.push({ type: 'compare', r1: evals1, r2: evalRound })
-    slides.push({ type: 'discuss' })
+    slides.push({
+      type: 'debrief',
+      v1: teamVerdict(evals1.company, 1),
+      v2: verdict,
+      r1: evals1.company,
+      r2: evalRound.company,
+    })
   }
   return slides
+}
+
+function baselineFrom(c) {
+  return { output: c.company_output, burnout: c.team_burnout, wellbeing: c.team_wellbeing }
 }
 
 async function computeRound(round) {
@@ -413,12 +451,7 @@ function renderSlide() {
   if (slide.type === 'player') {
     stage(playerCardHtml(slide), hint)
     animateCard()
-    if (newSlide) {
-      if (slide.result.win) {
-        sfx.win()
-        confetti()
-      } else sfx.fail()
-    }
+    if (newSlide) (slide.result.medal ? sfx.win() : sfx.fail())
     return
   }
   if (slide.type === 'company') {
@@ -427,10 +460,21 @@ function renderSlide() {
     if (newSlide) sfx.fanfare()
     return
   }
+  if (slide.type === 'team') {
+    stage(teamCardHtml(slide), hint)
+    animateCard()
+    if (newSlide) {
+      if (slide.verdict.win) {
+        sfx.win()
+        confetti()
+      } else sfx.fail()
+    }
+    return
+  }
   if (slide.type === 'compare') return stage(compareHtml(slide), hint)
-  if (slide.type === 'discuss') {
-    stage(discussHtml(), hint)
-    if (newSlide) confetti()
+  if (slide.type === 'debrief') {
+    stage(debriefHtml(slide), hint)
+    if (newSlide && slide.v2.win) confetti()
     return
   }
 }
@@ -534,7 +578,7 @@ function playerCardHtml(slide) {
           <div class="name">${r.name}</div>
           <div class="title">${r.title} · ${escapeHtml(playerName(res.role))}</div>
         </div>
-        <span class="badge ${res.win ? 'win' : 'fail'}">${res.win ? '✓ Goal met' : '✗ Goal missed'}</span>
+        <span class="badge ${res.medal ? 'win' : 'fail'}">${res.medal ? '🏅 ' + r.medalLabel : '— no medal'}</span>
       </div>
       <div class="reveal-grid">
         <div>
@@ -553,17 +597,41 @@ function playerCardHtml(slide) {
 
 function companyCardHtml(slide) {
   const c = slide.company
+  const delivered = c.company_output >= OUTPUT_FLOOR
   return `
     <div class="company">
-      <h1>Dunder Mifflin — Company Income</h1>
-      <p class="muted" style="font-size:1.5rem">Driven by deep work delivered against Michael’s targets.</p>
-      <div class="bigmeter"><div class="fill" id="cofill" data-fill="${c.company_income}"></div></div>
-      <div class="bigmeter-val"><span data-count="${c.company_income}">0</span>/100</div>
+      <h1>Dunder Mifflin — Company Output</h1>
+      <p class="muted" style="font-size:1.5rem">Orders delivered, driven by deep work against Michael’s targets.</p>
+      <div class="bigmeter">
+        <div class="floor-mark" style="left:${OUTPUT_FLOOR}%" title="Orders floor"></div>
+        <div class="fill" id="cofill" data-fill="${c.company_output}"></div>
+      </div>
+      <div class="bigmeter-val"><span data-count="${c.company_output}">0</span>/100
+        <span class="muted" style="font-size:1.4rem">· orders floor ${OUTPUT_FLOOR} ${delivered ? '✓' : '✗'}</span>
+      </div>
       <div class="legend" style="margin-top:18px">
         <span>Team wellbeing <strong>${c.team_wellbeing}</strong>${c.pam_buffer ? ' <span class="muted">(+5 Pam buffer)</span>' : ''}</span>
         <span>Team burnout <strong>${c.team_burnout}</strong></span>
-        <span>Company productivity <strong>${c.company_productivity}</strong></span>
+        <span>Output <strong>${c.company_output}</strong></span>
       </div>
+    </div>`
+}
+
+// The headline team verdict — win/lose for everyone, with the two axes shown.
+function teamCardHtml(slide) {
+  const v = slide.verdict
+  const axes =
+    v.round === 1
+      ? `<div class="axis ${v.delivered ? 'pass' : 'fail'}">📦 Orders delivered — output ${v.output} (need ≥ ${OUTPUT_FLOOR}) ${v.delivered ? '✓' : '✗'}</div>
+         <div class="axis ${v.healthy ? 'pass' : 'fail'}">🔋 Team out of burnout — ${v.burnout} (need ≤ ${BURNOUT_CAP}) ${v.healthy ? '✓' : '✗'}</div>`
+      : `<div class="axis ${v.delivered ? 'pass' : 'fail'}">📦 Held the orders — output ${v.output} (need ≥ ${OUTPUT_FLOOR}) ${v.delivered ? '✓' : '✗'}</div>
+         <div class="axis ${v.healthy ? 'pass' : 'fail'}">💚 Healthier than the 40h week — burnout & wellbeing both improved ${v.healthy ? '✓' : '✗'}</div>`
+  return `
+    <div class="team-verdict ${v.win ? 'win' : 'fail'}">
+      <div class="pill">${v.round === 1 ? 'Round 1 · Team result' : 'Round 2 · The verdict'}</div>
+      <h1 class="verdict-headline">${v.win ? '🎉 ' : ''}${v.headline}</h1>
+      <div class="axes">${axes}</div>
+      <p class="verdict-detail">${v.detail}</p>
     </div>`
 }
 
@@ -586,7 +654,7 @@ function compareHtml(slide) {
         </div>`
       }).join('')
       return `<div class="compare-row">
-        <div class="role-head"><div class="avatar role-${p.role}">${avatarSVG(p.role)}</div><div><div style="font-weight:800">${r.name.split(' ')[0]}</div><div class="muted">${a.win ? 'R1 ✓' : 'R1 ✗'} · ${b.win ? 'R2 ✓' : 'R2 ✗'}</div></div></div>
+        <div class="role-head"><div class="avatar role-${p.role}">${avatarSVG(p.role)}</div><div><div style="font-weight:800">${r.name.split(' ')[0]}</div><div class="muted">${a.medal ? 'R1 🏅' : 'R1 —'} · ${b.medal ? 'R2 🏅' : 'R2 —'}</div></div></div>
         <div class="stack" style="display:grid;gap:8px">${metricRows}</div>
       </div>`
     })
@@ -599,12 +667,43 @@ function compareHtml(slide) {
     </div>`
 }
 
-function discussHtml() {
+// Data-driven debrief: the R1→R2 deltas, the verdict, and a tailored "what would
+// have helped" prompt keyed to how the team actually lost (if it did).
+function debriefHtml(slide) {
+  const { v1, v2, r1, r2 } = slide
+  const delta = (a, b, goodLow) => {
+    const d = b - a
+    const good = goodLow ? d < 0 : d > 0
+    const arrow = d === 0 ? '→' : d > 0 ? '▲' : '▼'
+    return `<span class="delta ${d === 0 ? '' : good ? 'good' : 'bad'}">${arrow} ${a} → ${b}</span>`
+  }
+
+  let lesson
+  if (v2.win) {
+    lesson =
+      'You did it. Same orders out the door, and the team is genuinely better off — that’s the real four-day-week finding: shorter hours, focused work, healthier people, no loss of output.'
+  } else if (v2.delivered && !v2.healthy) {
+    lesson =
+      'You held output but just crammed five days into four — burnout didn’t fall. What would have helped: trim Michael’s meetings/targets and trade some deep-work hours for rest, trusting the focus bonus to carry output.'
+  } else if (!v2.delivered && v2.healthy) {
+    lesson =
+      'The team felt better but the orders slipped. What would have helped: protect a bit more deep work (and have Michael keep targets realistic) so output stayed above the line.'
+  } else {
+    lesson =
+      'Output fell and the team wasn’t better off. What would have helped: cut meeting overhead, then rebalance — enough focused deep work to deliver, enough rest to recover.'
+  }
+
   return `
-    <div class="splash">
-      <div class="pill">Debrief</div>
-      <h1 style="font-size:clamp(2.4rem,7vw,6rem)">What did you cut first —<br/>and why?</h1>
-      <p class="muted" style="font-size:1.6rem;margin-top:3vh">Compare the two weeks. Who thrived with a four-day week? Who couldn’t make it fit?</p>
+    <div class="debrief">
+      <div class="pill">Debrief · 40-hour → 32-hour</div>
+      <div class="debrief-stats">
+        <div class="dstat"><span class="muted">Output</span>${delta(r1.company_output, r2.company_output, false)}</div>
+        <div class="dstat"><span class="muted">Team burnout</span>${delta(r1.team_burnout, r2.team_burnout, true)}</div>
+        <div class="dstat"><span class="muted">Team wellbeing</span>${delta(r1.team_wellbeing, r2.team_wellbeing, false)}</div>
+      </div>
+      <h1 class="verdict-headline ${v2.win ? 'win' : 'fail'}">${v2.win ? '🎉 ' : ''}${v2.headline}</h1>
+      <p class="intro-body" style="max-width:60ch;margin:2vh auto 0">${lesson}</p>
+      <p class="muted" style="font-size:1.4rem;margin-top:3vh">💬 What did you cut first — and would you keep the four-day week?</p>
     </div>`
 }
 

@@ -30,19 +30,41 @@ The host drives the game from the big screen:
 A 6th+ person, or anyone joining after the game starts, joins as a **spectator** (they
 watch the big screen; they don't get a role).
 
+## It's a team game
+
+Everyone **wins or loses together**, on two axes:
+
+- **Output** — did the team deliver corporate's paper orders? (an absolute floor —
+  corporate doesn't shrink the order book just because you work less)
+- **Wellbeing** — is the team out of burnout?
+
+**Round 1 (40h) is the baseline** — your "normal" week. **Round 2 (32h) is judged against
+it:** the four‑day week only *works* if it holds output at the floor **and** leaves the
+team healthier than Round 1 (less burnout, more wellbeing). The two honest failure modes
+both show up — output drops (the shorter week cost you), or you just crammed five days into
+four and nobody's better off.
+
+Each role also has a personal **medal** (Dwight = Top Producer, Pam = Morale MVP, Toby =
+Compliance Clear, Oscar = Books Balanced, Michael = In Control) for flavour — but a medal
+never overrides the team result, so you can't "win" by optimising your own numbers while
+the company tanks.
+
 ## How a game runs
 
 1. **Lobby** — players join; host presses Space to start (needs ≥2 players).
-2. **Michael plans** — player 1 (Michael) sets daily meeting hours for everyone and a
-   deep‑work target per teammate, then locks in.
+2. **Intro + plan** — the big screen sets the scene (Dunder Mifflin, the week's brief, the
+   shared team goal) while Michael sets daily meeting hours and a deep‑work target per
+   teammate. Everyone else sees the same intro plus their role on their phone.
 3. **Allocate (Round 1, 40h)** — everyone splits their remaining daily hours across
-   deep work / admin / learning / rest, watching live burnout, stress, wellbeing and
-   productivity gauges. Lock in when ready.
-4. **Reveal** — host steps through each character (schedule, metrics, win/fail), then a
-   company‑income gauge.
+   deep work / admin / learning / rest with **+/− steppers**, watching live burnout,
+   stress, wellbeing and productivity gauges. Lock in when ready.
+4. **Reveal** — host steps through each character (schedule, metrics, personal medal), the
+   company‑output gauge, then the **team verdict** (the round‑1 baseline result).
 5. **Round 2 (32h)** — Friday is struck off. Michael may only *reduce* meetings/targets.
    Everyone re‑allocates from scratch.
-6. **Final** — reveal again, a Round 1 vs Round 2 comparison chart, and a discussion prompt.
+6. **Final** — reveal again, the **Round 2 team verdict** (judged vs the round‑1 baseline),
+   a Round 1 vs Round 2 comparison chart, and a **data‑driven debrief**: the output /
+   burnout / wellbeing deltas, the verdict, and a tailored "what would've helped".
 
 ## Hosting (Netlify / GitHub Pages)
 
@@ -107,10 +129,10 @@ logic, which the spec explicitly allows.
 |---|---|---|
 | 1 | Slider granularity | `0.5h` steps |
 | 2 | Company income during allocation | Hidden — shown only at reveal/final |
-| 3 | Win/fail display | Badge **plus** a themed score (e.g. Dwight's bonus €) |
-| 4 | Debrief | Built‑in discussion slide |
+| 3 | Win/fail display | Shared **team verdict** (the headline) plus a per‑role **medal** badge + themed score |
+| 4 | Debrief | Built‑in, data‑driven debrief slide (R1→R2 deltas + a tailored takeaway) |
 | 6 | Phase advancement | Host advances manually with Space |
-| 7 | Metric calibration | Recalibrated so a balanced 8h day = exactly 50 on all metrics; win thresholds playtested (Michael's company + Pam's team‑wellbeing bars set to 60) so every role is winnable in both rounds |
+| 7 | Metric calibration | Balanced 8h day = exactly 50 on all metrics; team thresholds (`OUTPUT_FLOOR`, `BURNOUT_CAP` in `game.js`) tuned in `test/calibrate.mjs` so a normal R1 passes, a panicked grind or slack‑off fails, and the four‑day week is winnable with smart play (verified 2p–5p) |
 | 8 | Target visibility | Players see their *own* deep‑work target during allocation |
 
 ### Metric model
@@ -135,3 +157,13 @@ on hours and the four‑day week (see `game.js`):
 Result: a balanced 8h day scores exactly 50 across the board in Round 1, and the same
 shape in the four‑day Round 2 shows lower burnout/stress, higher wellbeing, and roughly
 equal output — the headline finding from real four‑day‑week trials.
+
+### Team verdict
+
+On top of the per‑player metrics, `teamVerdict()` (in `game.js`) decides the shared
+win/lose. The team's **output** (`company_output` — deep work delivered against Michael's
+targets, averaged) must clear `OUTPUT_FLOOR` in both rounds. Round 1 also needs team
+burnout ≤ `BURNOUT_CAP` and records the **baseline**. Round 2 is judged *relative to that
+baseline*: hold output at the floor **and** end up healthier (burnout down **and**
+wellbeing up). `test/calibrate.mjs` simulates several team strategies to keep these
+thresholds honest.

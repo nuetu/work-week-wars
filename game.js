@@ -8,6 +8,14 @@
 // Assignment order (Michael is always player 1). With <5 players, fill from top.
 export const ROLE_ORDER = ['michael', 'dwight', 'pam', 'toby', 'oscar']
 
+// The whole team wins or loses together (see teamVerdict). Each role ALSO has a
+// personal "medal" — a flavour achievement that never overrides the team result,
+// so you can't win by optimising your own numbers while the company tanks.
+//   goal     — the role's personal angle / motivation (flavour)
+//   job      — the role's contribution to the shared team goal
+//   weakness — what to watch out for (shown as "⚠️ Watch out for")
+//   medal    — (metrics+team ctx, weekly totals) -> bool : personal achievement
+//   medalLabel / target — the star's name and the bar to clear (shown on cards)
 export const ROLES = {
   michael: {
     name: 'Michael Scott',
@@ -15,13 +23,12 @@ export const ROLES = {
     emoji: '🧑‍💼',
     color: '#2f6fb3',
     goal: 'Feel in control — your meetings must happen.',
-    weakness: 'Too many meetings tank team productivity and morale.',
-    // metrics: company-level; schedule: this player's weekly hours
+    job: 'You set everyone’s meeting load and deep-work targets. Coordinate the team without stealing their focus time.',
+    weakness: 'Too many meetings eat everyone’s focus hours and tank morale.',
+    medalLabel: 'In Control',
     // Per-day so it scales with the round: ≥1.2h/day = 6h in R1, 4.8h in R2.
-    // (A fixed weekly 6h would trap Michael in R2, where he can only reduce.)
-    win: (m, s) => s.meet / s.days >= 1.2 && m.company_productivity >= 60,
-    // Friendly description of the bar to clear, shown on cards.
-    target: 'Meetings ≥ 1.2h/day  &  company productivity ≥ 60',
+    medal: (m, s) => s.meet / s.days >= 1.2 && m.company_output >= OUTPUT_FLOOR,
+    target: 'Meetings ≥ 1.2h/day  &  orders still delivered',
   },
   dwight: {
     name: 'Dwight Schrute',
@@ -29,8 +36,10 @@ export const ROLES = {
     emoji: '🥋',
     color: '#9c7a2e',
     goal: 'Maximize your bonus — hit Michael’s deep-work target.',
+    job: 'The output engine — deliver the deep work that fills the orders, without torching yourself.',
     weakness: 'Deep work without rest spikes burnout hard.',
-    win: (m, s) => s.deep >= s.target_weekly && m.burnout < 80,
+    medalLabel: 'Top Producer',
+    medal: (m, s) => s.deep >= s.target_weekly && m.burnout < 80,
     target: 'Deep work ≥ target  &  burnout < 80',
   },
   pam: {
@@ -39,8 +48,10 @@ export const ROLES = {
     emoji: '🎨',
     color: '#b8552e',
     goal: 'Keep the team happy — you are the wellbeing buffer.',
+    job: 'The morale buffer — your rest and support lift the whole team’s wellbeing.',
     weakness: 'Too much admin overloads you; your burnout climbs fast.',
-    win: (m, s) => m.team_wellbeing >= 60 && m.burnout < 75,
+    medalLabel: 'Morale MVP',
+    medal: (m, s) => m.team_wellbeing >= 60 && m.burnout < 75,
     target: 'Team wellbeing ≥ 60  &  your burnout < 75',
   },
   toby: {
@@ -49,8 +60,10 @@ export const ROLES = {
     emoji: '📋',
     color: '#5a7d5a',
     goal: 'Hit HR compliance hours (your "deep work").',
+    job: 'Keep HR & compliance covered so the company dodges fines.',
     weakness: 'Every meeting Michael schedules eats your compliance window.',
-    win: (m, s) => s.deep >= 8 && m.team_burnout < 65,
+    medalLabel: 'Compliance Clear',
+    medal: (m, s) => s.deep >= 8 && m.team_burnout < 65,
     target: 'Compliance ≥ 8h/wk  &  team burnout < 65',
   },
   oscar: {
@@ -59,14 +72,47 @@ export const ROLES = {
     emoji: '📊',
     color: '#3b6e6e',
     goal: 'Precision — keep admin + analysis in a stable band.',
+    job: 'Keep hours efficient — steady analysis, no wasted admin, watch the budget.',
     weakness: 'Excess meetings spike your stress disproportionately.',
-    win: (m, s) => {
+    medalLabel: 'Books Balanced',
+    medal: (m, s) => {
       const band = s.admin + s.deep
       return band >= 10 && band <= 18 && m.stress < 70
     },
     target: 'Admin + deep work in 10–18h  &  stress < 70',
   },
 }
+
+// ---------------------------------------------------------------------------
+// Shared team goal + the four-day-week story
+// ---------------------------------------------------------------------------
+
+// The headline objective every role shares.
+export const TEAM_GOAL = {
+  title: 'Keep Dunder Mifflin Scranton in business — together.',
+  output: 'Deliver corporate’s paper orders (team output stays above the line)…',
+  wellbeing: '…without burning the team out.',
+}
+
+// Intro narrative shown at the start of each round (big screen + phones).
+export const ROUND_INTRO = {
+  1: {
+    pill: 'Round 1 · The 40-hour week',
+    title: 'Welcome to Scranton',
+    body: 'You work at Dunder Mifflin, a paper company in Scranton, Pennsylvania. Corporate wants every branch to submit a weekly schedule — five 8-hour days. Split your time between deep work, admin, learning and rest, keep the orders flowing, and try not to burn out. This is your normal week — the baseline everything else is measured against.',
+  },
+  2: {
+    pill: 'Round 2 · The 32-hour week',
+    title: 'Corporate tries something new',
+    body: 'Corporate read about the four-day week and wants Scranton to pilot it: Fridays off, 32 hours, same order book. Submit a reduced schedule. The experiment only “works” if you keep output at the line AND the team ends up better off than your 40-hour baseline — less burnout, more wellbeing. Michael can only trim meetings and targets now, not raise them.',
+  },
+}
+
+// Team win thresholds (tuned in test/calibrate.mjs). Output is an absolute floor
+// both rounds (corporate doesn't shrink the order book); the wellbeing axis in R2
+// is judged RELATIVE to the round-1 baseline.
+export const OUTPUT_FLOOR = 45 // company_output (0–100) needed to "deliver the orders"
+export const BURNOUT_CAP = 62 // round-1 team burnout must stay at/below this
 
 // ---------------------------------------------------------------------------
 // Phase machine
@@ -268,16 +314,17 @@ export function evaluateRound(entries, meetingHrsPerDay, round, priorBurnout = {
   const team_burnout = Math.round(avg((r) => r.metrics.burnout))
   let team_wellbeing = avg((r) => r.metrics.wellbeing)
 
-  // Company productivity: average of (deep delivered vs target, capped at 1) × productivity.
-  const company_productivity = Math.round(
+  // Company output ("did we deliver the orders"): average of (deep delivered vs
+  // target, capped at 1) × productivity. This is the shared output axis.
+  const company_output = Math.round(
     avg((r) => {
       const ratio = r.target_weekly > 0 ? Math.min(r.weekly.deep / r.target_weekly, 1) : 1
       return ratio * r.metrics.productivity
     })
   )
 
-  // Pam's buffer: if Pam wins (on the base team wellbeing) she adds +5 to the
-  // displayed team wellbeing aggregate.
+  // Pam's buffer: if Pam earns her medal (on the base team wellbeing) she adds +5
+  // to the displayed team wellbeing aggregate.
   const pamResult = results.find((r) => r.role === 'pam')
   let pamWins = false
   if (pamResult) {
@@ -287,34 +334,92 @@ export function evaluateRound(entries, meetingHrsPerDay, round, priorBurnout = {
   team_wellbeing = Math.round(team_wellbeing + (pamWins ? 5 : 0))
 
   const company = {
-    company_productivity,
-    company_income: company_productivity, // 0–100 gauge, open question #2: reveal only
+    company_output,
+    company_income: company_output, // 0–100 gauge, open question #2: reveal only
     team_burnout,
     team_wellbeing,
     pam_buffer: pamWins,
   }
 
-  // Second pass: evaluate win/fail with full context.
+  // Second pass: evaluate each role's personal MEDAL with full context.
   for (const r of results) {
     const ctx = {
       ...r.metrics,
-      company_productivity,
+      company_output,
       team_burnout,
       team_wellbeing,
     }
     const sched = { ...r.weekly, target_weekly: r.target_weekly, days }
-    r.win = !!ROLES[r.role].win(ctx, sched)
+    r.medal = !!ROLES[r.role].medal(ctx, sched)
     r.summary = roleSummary(r, company)
   }
 
   return { results, company }
 }
 
+// ---------------------------------------------------------------------------
+// Team verdict — the headline win/lose, shared by everyone.
+// ---------------------------------------------------------------------------
+//
+// Round 1 (40h) is the BASELINE: deliver the orders without the team burning out.
+// Round 2 (32h) is judged against that baseline: hold output at the same floor
+// AND end up healthier than round 1 (lower burnout + higher wellbeing). That's
+// the only way the four-day week "works".
+//
+//   company  — the round's company aggregates (from evaluateRound)
+//   round    — 1 | 2
+//   baseline — round-1 { output, burnout, wellbeing } (required for round 2)
+//
+// Returns { round, win, delivered, healthy, output, burnout, wellbeing,
+//           headline, detail }.
+export function teamVerdict(company, round, baseline = null) {
+  const output = company.company_output
+  const burnout = company.team_burnout
+  const wellbeing = company.team_wellbeing
+  const delivered = output >= OUTPUT_FLOOR
+
+  if (round === 1) {
+    const healthy = burnout <= BURNOUT_CAP
+    const win = delivered && healthy
+    let headline, detail
+    if (win) {
+      headline = 'Solid normal week'
+      detail = 'Orders out the door and the team’s holding up. This is your baseline — Round 2 has to beat it.'
+    } else if (!delivered) {
+      headline = 'Behind on orders'
+      detail = 'Corporate isn’t happy — not enough got delivered. You’ll need more focused output.'
+    } else {
+      headline = 'Running too hot'
+      detail = 'Orders shipped, but the team is burning out. Sustainable? Not really.'
+    }
+    return { round, win, delivered, healthy, output, burnout, wellbeing, headline, detail }
+  }
+
+  // Round 2: healthier than the round-1 baseline.
+  const healthy = !!baseline && burnout < baseline.burnout && wellbeing > baseline.wellbeing
+  const win = delivered && healthy
+  let headline, detail
+  if (win) {
+    headline = 'The four-day week worked! 🎉'
+    detail = 'Same orders out the door, and the team is genuinely better off than the 40-hour week — less burnout, more wellbeing. That’s the headline finding, lived.'
+  } else if (delivered && !healthy) {
+    headline = 'You just crammed it in'
+    detail = 'Output held, but the team is no better off than Round 1 — you squeezed five days into four. The point of the shorter week was lost.'
+  } else if (!delivered && healthy) {
+    headline = 'Happier, but orders slipped'
+    detail = 'The team feels better, but output dropped below the line. Corporate sees a productivity hit, not a win.'
+  } else {
+    headline = 'The experiment failed'
+    detail = 'Output dropped AND the team isn’t better off. The shorter week didn’t deliver on either front.'
+  }
+  return { round, win, delivered, healthy, output, burnout, wellbeing, headline, detail }
+}
+
 // A themed "score" line per role (open question #3 — badge + score).
 function roleSummary(r, company) {
   switch (r.role) {
     case 'michael':
-      return { label: 'Company income', value: `${company.company_income}/100` }
+      return { label: 'Company output', value: `${company.company_income}/100` }
     case 'dwight': {
       const pct = r.target_weekly > 0 ? Math.round((r.weekly.deep / r.target_weekly) * 100) : 0
       const bonus = Math.round((pct / 100) * 4200)
