@@ -713,3 +713,44 @@ footer.foot {
   font-size: 0.85em;
   padding: 24px 0;
 }
+
+/* Floating "ℹ️ Role" button + role overlay shown during play. */
+.role-fab {
+  position: fixed;
+  right: 16px;
+  bottom: 16px;
+  z-index: 40;
+  width: auto;
+  padding: 0.6em 1em;
+  border-radius: 999px;
+  font-weight: 700;
+  font-size: 0.95rem;
+  background: var(--panel-2);
+  border: 2px solid var(--line);
+  color: var(--text);
+  box-shadow: var(--shadow);
+}
+.role-fab[hidden] {
+  display: none;
+}
+
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(2px);
+}
+.modal-backdrop[hidden] {
+  display: none;
+}
+.modal-card {
+  width: 100%;
+  max-width: 460px;
+  max-height: 90vh;
+  overflow-y: auto;
+}

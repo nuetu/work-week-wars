@@ -231,6 +231,11 @@ async function onEnterPhase() {
 // ---------------------------------------------------------------------------
 
 function render() {
+  renderPhase()
+  syncRoleUI()
+}
+
+function renderPhase() {
   const phase = state.room.phase
   if (state.player.role === 'spectator') return renderSpectator()
   const isMichael = state.player.role === 'michael'
@@ -238,14 +243,14 @@ function render() {
     case 'lobby':
       return renderLobby()
     case 'michael_sets':
-      return isMichael ? renderMichaelSetup(false) : renderWaiting('Michael is planning the week', '🧑‍💼')
+      return isMichael ? renderMichaelSetup(false) : renderRolePage('Michael is planning the week')
     case 'allocating':
     case 'round2_allocating':
       return state.locked ? renderLocked() : renderAllocating()
     case 'reveal':
       return renderResult(1)
     case 'round2_setup':
-      return isMichael ? renderMichaelSetup(true) : renderWaiting('Michael is adjusting the schedule', '🧑‍💼')
+      return isMichael ? renderMichaelSetup(true) : renderRolePage('Michael is adjusting the schedule')
     case 'final':
       return renderFinal()
     default:
@@ -257,24 +262,42 @@ function render() {
 // lobby — role card
 // ---------------------------------------------------------------------------
 
+// Shared role explainer used on the lobby card, the "Michael is setting up" page,
+// and the in-game "ℹ️ Role" overlay.
+function roleCardHTML(role) {
+  const r = ROLES[role]
+  return `
+    <div class="card stack role-${role}">
+      <div class="role-head">
+        <div class="avatar role-${role}">${avatarSVG(role)}</div>
+        <div>
+          <div class="name">${r.name}</div>
+          <div class="title">${r.title}</div>
+        </div>
+      </div>
+      <p><strong>🎯 Your goal.</strong> ${r.goal}</p>
+      <p><strong>⚠️ Watch out for.</strong> ${r.weakness}</p>
+      <p class="target-note"><strong>✅ To win:</strong> ${r.target}</p>
+    </div>`
+}
+
 function renderLobby() {
-  const r = ROLES[state.player.role]
   app.innerHTML = `
     <div class="stack" style="padding-top:6vh">
       <div class="center"><div class="pill">Room ${state.room.code} · You're in!</div></div>
-      <div class="card stack role-${state.player.role}">
-        <div class="role-head">
-          <div class="avatar role-${state.player.role}">${avatarSVG(state.player.role)}</div>
-          <div>
-            <div class="name">${r.name}</div>
-            <div class="title">${r.title}</div>
-          </div>
-        </div>
-        <p><strong>🎯 Goal.</strong> ${r.goal}</p>
-        <p><strong>⚠️ Weakness.</strong> ${r.weakness}</p>
-        <p class="target-note"><strong>To win:</strong> ${r.target}</p>
-      </div>
+      ${roleCardHTML(state.player.role)}
       <div class="center muted">Waiting for the host to start the game…</div>
+    </div>`
+}
+
+// Shown to non-Michael players while Michael sets up (both rounds): re-introduce
+// the role and goal so the wait is useful.
+function renderRolePage(footerMsg) {
+  app.innerHTML = `
+    <div class="stack" style="padding-top:4vh">
+      <div class="center"><div class="pill">Get to know your role</div></div>
+      ${roleCardHTML(state.player.role)}
+      <div class="center muted">${footerMsg}<span class="dots"></span></div>
     </div>`
 }
 
@@ -642,6 +665,67 @@ async function renderFinal() {
       </div>`
     cmp.appendChild(node)
   })
+}
+
+// ---------------------------------------------------------------------------
+// in-game role overlay — a floating "ℹ️ Role" button that reopens the role
+// card during play, so a player can re-check their goal without leaving.
+// ---------------------------------------------------------------------------
+
+// Phases where a real (non-spectator) player is actively playing and may want
+// to re-read their role. The lobby + "Michael is setting up" pages already show
+// the full role card, so the button would be redundant there.
+const ROLE_FAB_PHASES = ['allocating', 'round2_allocating', 'reveal', 'final']
+
+function ensureRoleUI() {
+  if (document.getElementById('roleFab')) return
+  const fab = document.createElement('button')
+  fab.id = 'roleFab'
+  fab.className = 'role-fab'
+  fab.type = 'button'
+  fab.innerHTML = 'ℹ️ Role'
+  fab.addEventListener('click', () => openRoleModal())
+  document.body.appendChild(fab)
+
+  const backdrop = document.createElement('div')
+  backdrop.id = 'roleModal'
+  backdrop.className = 'modal-backdrop'
+  backdrop.hidden = true
+  backdrop.addEventListener('click', (e) => {
+    if (e.target === backdrop || e.target.closest('[data-close]')) closeRoleModal()
+  })
+  document.body.appendChild(backdrop)
+}
+
+function openRoleModal() {
+  const backdrop = document.getElementById('roleModal')
+  if (!backdrop) return
+  backdrop.innerHTML = `
+    <div class="modal-card stack" role="dialog" aria-modal="true">
+      ${roleCardHTML(state.player.role)}
+      <button class="big ghost" data-close type="button">Close</button>
+    </div>`
+  backdrop.hidden = false
+}
+
+function closeRoleModal() {
+  const backdrop = document.getElementById('roleModal')
+  if (backdrop) backdrop.hidden = true
+}
+
+// Show the floating button only when a real player is mid-game; hide (and close
+// any open modal) otherwise. Called from render() after every phase paint.
+function syncRoleUI() {
+  const role = state.player?.role
+  const show = role && role !== 'spectator' && ROLE_FAB_PHASES.includes(state.room.phase)
+  if (!show) return hideRoleUI()
+  ensureRoleUI()
+  document.getElementById('roleFab').hidden = false
+}
+
+function hideRoleUI() {
+  document.getElementById('roleFab')?.setAttribute('hidden', '')
+  closeRoleModal()
 }
 
 // ---------------------------------------------------------------------------
