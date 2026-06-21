@@ -26,6 +26,10 @@ The host drives the game from the big screen:
 - **Space** (or `→` / `Enter`) — advance to the next phase / next reveal card.
 - **A** — toggle auto‑advance (skips straight to the reveal once all players lock).
 - **M** — mute / unmute sound effects.
+- **🔄 New game** (on‑screen button, bottom‑right) — starts a fresh game: it tells
+  every connected phone and the big screen to wipe their saved session, then loads a
+  brand‑new room code. Use this to reset cleanly between groups so nobody resumes a
+  stale session.
 
 A 6th+ person, or anyone joining after the game starts, joins as a **spectator** (they
 watch the big screen; they don't get a role).
@@ -53,18 +57,24 @@ the company tanks.
 
 1. **Lobby** — players join; host presses Space to start (needs ≥2 players).
 2. **Intro + plan** — the big screen sets the scene (Dunder Mifflin, the week's brief, the
-   shared team goal) while Michael sets daily meeting hours and a deep‑work target per
-   teammate. Everyone else sees the same intro plus their role on their phone.
+   shared team goal) **and explains the model**: the three team numbers everyone is
+   steering (output / burnout / wellbeing) and how each control moves the dials. Meanwhile
+   Michael sets daily meeting hours and a deep‑work target per teammate (with the same
+   +/− steppers players use, plus a note on *why* he sets each). Everyone else sees the
+   intro, their role, a glossary and a how‑it‑works guide on their phone.
 3. **Allocate (Round 1, 40h)** — everyone splits their remaining daily hours across
-   deep work / admin / learning / rest with **+/− steppers**, watching live burnout,
-   stress, wellbeing and productivity gauges. Lock in when ready.
+   deep work / admin / learning / rest with **+/− steppers**, while a pinned
+   "your week at a glance" panel shows live burnout, stress, wellbeing and productivity
+   gauges. Lock in when ready.
 4. **Reveal** — host steps through each character (schedule, metrics, personal medal), the
    company‑output gauge, then the **team verdict** (the round‑1 baseline result).
 5. **Round 2 (32h)** — Friday is struck off. Michael may only *reduce* meetings/targets.
    Everyone re‑allocates from scratch.
 6. **Final** — reveal again, the **Round 2 team verdict** (judged vs the round‑1 baseline),
-   a Round 1 vs Round 2 comparison chart, and a **data‑driven debrief**: the output /
-   burnout / wellbeing deltas, the verdict, and a tailored "what would've helped".
+   a Round 1 vs Round 2 comparison chart, a **data‑driven debrief** (the output /
+   burnout / wellbeing deltas, the verdict, and a tailored "what would've helped"), and
+   finally **five full‑screen discussion questions**, one per Space press — presentation
+   style, to run the closing conversation.
 
 ## Hosting (Netlify / GitHub Pages)
 
@@ -82,6 +92,24 @@ plain `*.html` paths, the pretty `/screen` · `/play` URLs, and project subdirec
 3. Your site goes live at `https://<user>.github.io/<repo>/screen.html`. Re-deploys
    happen on every push. (Relative paths and the QR/join logic handle the `/<repo>/`
    subdirectory automatically.)
+
+#### Fixing the HTTPS certificate warning (custom domain)
+
+If you serve under a custom domain (this repo ships a `CNAME` → `game.benkeil.com`)
+and browsers warn that the connection isn't private / the certificate doesn't match,
+GitHub Pages is serving its default `*.github.io` certificate because it hasn't yet
+**provisioned a TLS certificate for your domain**. The fix is in **Settings → Pages**,
+not in the code:
+
+1. Confirm DNS points at GitHub Pages — an `A`/`ALIAS` to `185.199.108–111.153`, or a
+   `CNAME` to `<user>.github.io` (this domain already does).
+2. In **Settings → Pages → Custom domain**, clear the field, **Save**, wait ~1 minute,
+   re-enter the domain (`game.benkeil.com`), and **Save** again. This re-triggers
+   Let's Encrypt provisioning, which can take a few minutes to an hour.
+3. Once the **Enforce HTTPS** checkbox is no longer greyed out, tick it.
+
+Until the certificate is issued, share the `https://<user>.github.io/<repo>/screen.html`
+URL (which always has a valid cert) instead of the custom domain.
 
 The Supabase URL and **publishable** key are embedded in [`supabase.js`](./supabase.js).
 Publishable/anon keys are designed to be public and ship in client code — access is

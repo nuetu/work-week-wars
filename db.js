@@ -213,3 +213,32 @@ export function subscribePlayers(roomId, cb) {
     )
     .subscribe()
 }
+
+// ---------------------------------------------------------------------------
+// New-game reset (no schema change — uses a Realtime broadcast)
+// ---------------------------------------------------------------------------
+//
+// When the host starts a brand-new game, every connected device should wipe its
+// locally-stored session so nobody resumes a stale room. We send a one-off
+// broadcast on a per-room channel; phones listen via subscribeReset and clear
+// their storage + reload. (Only reaches devices currently in the room — exactly
+// the ones that need clearing.)
+
+export async function broadcastReset(roomId) {
+  const ch = supabase.channel('reset-' + roomId)
+  await new Promise((resolve) => {
+    ch.subscribe((status) => {
+      if (status === 'SUBSCRIBED') resolve()
+    })
+  })
+  await ch.send({ type: 'broadcast', event: 'reset', payload: {} })
+  await new Promise((r) => setTimeout(r, 300)) // let the message flush before teardown
+  supabase.removeChannel(ch)
+}
+
+export function subscribeReset(roomId, cb) {
+  return supabase
+    .channel('reset-' + roomId)
+    .on('broadcast', { event: 'reset' }, () => cb())
+    .subscribe()
+}

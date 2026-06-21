@@ -14,6 +14,9 @@ import {
   teamVerdict,
   TEAM_GOAL,
   ROUND_INTRO,
+  CONTROL_GUIDE,
+  GLOSSARY,
+  MEDAL_NOTE,
 } from './game.js'
 import {
   getRoomByCode,
@@ -31,6 +34,7 @@ import {
   resetLocks,
   subscribeRoom,
   subscribePlayers,
+  subscribeReset,
 } from './db.js'
 import { avatarSVG } from './avatars.js'
 import { sfx, resume as audioResume } from './audio.js'
@@ -203,6 +207,13 @@ function subscribe() {
       if (!editing) render()
     })
   )
+  // Host pressed "New game" → wipe our stored session and return to the join screen.
+  state.channels.push(
+    subscribeReset(state.room.id, () => {
+      clearSaved()
+      location.reload()
+    })
+  )
 }
 
 // Runs once whenever we land on a new phase.
@@ -292,8 +303,49 @@ function roleCardHTML(role) {
       </div>
       <p><strong>🧩 Your job.</strong> ${r.job}</p>
       <p><strong>⚠️ Watch out for.</strong> ${r.weakness}</p>
-      <p class="target-note"><strong>🏅 ${r.medalLabel} (personal):</strong> ${r.target}</p>
+      <div class="medal-note">
+        <div class="medal-head">🏅 Your medal — ${r.medalLabel}</div>
+        <div class="medal-target">Earn it by: ${r.target}</div>
+        <div class="medal-fine">${MEDAL_NOTE}</div>
+      </div>
     </div>`
+}
+
+// How-it-works explainer: the control→dials guide + the two FAQs (admin vs deep,
+// learning vs rest, "why 7h rest?"). Reused on the wait page and role overlay.
+function controlGuideHTML() {
+  const rows = CONTROL_GUIDE.controls
+    .map(
+      (c) => `
+      <div class="cg-row">
+        <div class="cg-head"><span class="cg-label">${c.emoji} ${c.label}</span><span class="cg-who">${c.who}</span></div>
+        <div class="cg-effect">${c.effect}</div>
+        <div class="cg-dials">${c.dials}</div>
+      </div>`
+    )
+    .join('')
+  const faqs = CONTROL_GUIDE.faqs
+    .map((f) => `<p class="cg-faq"><strong>${f.q}</strong><br/>${f.a}</p>`)
+    .join('')
+  return `
+    <details class="card explain">
+      <summary><strong>📖 How your choices move the dials</strong></summary>
+      <p class="muted" style="margin-top:10px">${CONTROL_GUIDE.intro}</p>
+      <div class="cg-list">${rows}</div>
+      <div class="cg-faqs">${faqs}</div>
+    </details>`
+}
+
+// The three team numbers everyone is steering (output / burnout / wellbeing).
+function glossaryHTML() {
+  const items = GLOSSARY.map(
+    (g) => `<p class="gl-item"><strong>${g.emoji} ${g.term}.</strong> ${g.desc}</p>`
+  ).join('')
+  return `
+    <details class="card explain">
+      <summary><strong>🎚️ The three numbers you’re steering</strong></summary>
+      <div style="margin-top:8px">${items}</div>
+    </details>`
 }
 
 function renderLobby() {
@@ -317,6 +369,8 @@ function renderRolePage(footerMsg) {
         <p class="muted" style="font-size:.95rem;line-height:1.5">${intro.body}</p>
       </div>
       ${roleCardHTML(state.player.role)}
+      ${glossaryHTML()}
+      ${controlGuideHTML()}
       <div class="center muted">${footerMsg}<span class="dots"></span></div>
     </div>`
 }
@@ -330,6 +384,41 @@ function renderMichaelSetup(isRound2) {
   // Round 1 defaults; round 2 caps at round-1 values (can only reduce).
   const meetingMax = isRound2 ? state.room.meeting_hrs : 4
   const meetingStart = isRound2 ? state.room.meeting_hrs : 1.5
+  const days = daysInRound(isRound2 ? 2 : 1)
+
+  // One config per stepper (meetings + a deep-work target per teammate). Uses the
+  // same +/- stepper UI players get during allocation, so the controls match.
+  const steppers = [
+    { id: 'meet', kind: 'meet', label: '📣 Daily meeting hours (everyone)', min: 0, max: meetingMax, step: SLIDER_STEP, value: meetingStart },
+  ]
+  for (const p of employees) {
+    const r = ROLES[p.role]
+    const prev = state.targets[p.role]
+    const tMax = isRound2 && prev != null ? prev : 6
+    const tStart = prev != null ? prev : 3
+    steppers.push({
+      id: 'tgt-' + p.role,
+      kind: 'target',
+      role: p.role,
+      label: `${r.emoji} ${r.name} <span class="muted">(${p.display_name})</span>`,
+      min: 0, max: tMax, step: SLIDER_STEP, value: tStart,
+    })
+  }
+  const byId = Object.fromEntries(steppers.map((s) => [s.id, s]))
+
+  const stepperHTML = (s) => `
+    <div class="stepper-row">
+      <div class="stepper-top">
+        <span class="slider-label">${s.label}</span>
+        <span class="slider-hrs" data-out="${s.id}">${s.value.toFixed(1)}h</span>
+      </div>
+      <div class="stepper">
+        <button type="button" class="step-btn" data-step="${s.id}" data-dir="-1" aria-label="Less">−</button>
+        <div class="step-bar"><div class="step-fill" data-bar="${s.id}"></div></div>
+        <button type="button" class="step-btn" data-step="${s.id}" data-dir="1" aria-label="More">+</button>
+      </div>
+      ${s.kind === 'meet' ? '<div class="slider-desc" data-week></div>' : ''}
+    </div>`
 
   app.innerHTML = `
     <div class="stack">
@@ -345,66 +434,49 @@ function renderMichaelSetup(isRound2) {
         }
       </p>
 
-      <div class="slider-row">
-        <div class="slider-top">
-          <span class="slider-label">📣 Daily meeting hours (everyone)</span>
-          <span class="slider-hrs" id="meet-hrs">${meetingStart.toFixed(1)}h</span>
-        </div>
-        <input id="meet" type="range" min="0" max="${meetingMax}" step="${SLIDER_STEP}" value="${meetingStart}" />
-        <div class="slider-desc" id="meet-week"></div>
+      <div class="card explain-inline stack">
+        <p style="margin:0"><strong>📣 Why you set meetings.</strong> Meeting hours come out of everyone’s day <em>before</em> they plan, so a little keeps the team aligned — but every hour you add is an hour of focus you take away, and it lifts stress and lowers wellbeing across the whole team.</p>
+        <p style="margin:0"><strong>🎯 Why you set deep-work targets.</strong> Targets tell each teammate how much focused output you need from them to fill corporate’s orders. Aim too high and they burn out chasing it; too low and the orders slip below the line — you’re balancing output against the team’s health.</p>
       </div>
 
+      ${stepperHTML(byId.meet)}
+
       <h3 style="margin-top:8px">Deep-work targets <span class="muted" style="font-weight:400">(hrs/day per person)</span></h3>
-      <div class="stack" id="targets"></div>
+      <div class="stack">${steppers.filter((s) => s.kind === 'target').map(stepperHTML).join('')}</div>
 
       <button id="lock" class="big">${isRound2 ? 'Lock & start Round 2' : 'Lock in & unlock the team'}</button>
     </div>`
 
-  const targetWrap = document.getElementById('targets')
-  for (const p of employees) {
-    const r = ROLES[p.role]
-    const prev = state.targets[p.role]
-    const tMax = isRound2 && prev != null ? prev : 6
-    const tStart = prev != null ? prev : 3
-    const row = document.createElement('div')
-    row.className = 'slider-row'
-    row.innerHTML = `
-      <div class="slider-top">
-        <span class="slider-label">${r.emoji} ${r.name} <span class="muted">(${p.display_name})</span></span>
-        <span class="slider-hrs" data-out="${p.role}">${tStart.toFixed(1)}h</span>
-      </div>
-      <input type="range" data-role="${p.role}" min="0" max="${tMax}" step="${SLIDER_STEP}" value="${tStart}" />`
-    targetWrap.appendChild(row)
+  const refresh = (s) => {
+    document.querySelector(`[data-out="${s.id}"]`).textContent = s.value.toFixed(1) + 'h'
+    document.querySelector(`[data-bar="${s.id}"]`).style.width =
+      s.max > s.min ? ((s.value - s.min) / (s.max - s.min)) * 100 + '%' : '0%'
+    document.querySelector(`.step-btn[data-step="${s.id}"][data-dir="-1"]`).disabled = s.value <= s.min + 1e-9
+    document.querySelector(`.step-btn[data-step="${s.id}"][data-dir="1"]`).disabled = s.value >= s.max - 1e-9
+    if (s.kind === 'meet') {
+      document.querySelector('[data-week]').textContent =
+        `= ${(s.value * days).toFixed(1)}h/week of meetings · leaves ${dailyAllocatable(s.value).toFixed(1)}h/day for each person to allocate`
+    }
   }
 
-  const meet = document.getElementById('meet')
-  const meetOut = document.getElementById('meet-hrs')
-  const meetWeek = document.getElementById('meet-week')
-  const days = daysInRound(isRound2 ? 2 : 1)
-  const updateMeet = () => {
-    const v = parseFloat(meet.value)
-    meetOut.textContent = v.toFixed(1) + 'h'
-    meetWeek.textContent = `= ${(v * days).toFixed(1)}h/week of meetings · leaves ${dailyAllocatable(v).toFixed(1)}h/day to allocate`
-  }
-  meet.addEventListener('input', updateMeet)
-  updateMeet()
-
-  targetWrap.querySelectorAll('input[type=range]').forEach((inp) => {
-    inp.addEventListener('input', () => {
-      targetWrap.querySelector(`[data-out="${inp.dataset.role}"]`).textContent =
-        parseFloat(inp.value).toFixed(1) + 'h'
+  document.querySelectorAll('.step-btn').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const s = byId[btn.dataset.step]
+      const next = s.value + parseFloat(btn.dataset.dir) * s.step
+      s.value = clampStep(next, s.min, s.max)
+      sfx.tick()
+      refresh(s)
     })
   })
+  steppers.forEach(refresh)
 
   document.getElementById('lock').addEventListener('click', async () => {
     audioResume()
     sfx.lock()
     setBusy('lock', true)
-    const meetingHrs = parseFloat(meet.value)
+    const meetingHrs = byId.meet.value
     const targetsByRole = {}
-    targetWrap.querySelectorAll('input[type=range]').forEach((inp) => {
-      targetsByRole[inp.dataset.role] = parseFloat(inp.value)
-    })
+    for (const s of steppers) if (s.kind === 'target') targetsByRole[s.role] = s.value
     try {
       await setMeetingHrs(state.room.id, meetingHrs)
       await saveTargets(state.room.id, isRound2 ? 2 : 1, targetsByRole)
@@ -432,32 +504,34 @@ function renderAllocating() {
   const myTarget = state.targets[state.player.role]
 
   app.innerHTML = `
-    <div class="stack">
-      <div class="center"><div class="pill">${round === 1 ? 'Round 1 · 40h week' : 'Round 2 · 32h week'} · ${r.name}</div></div>
+    <div class="alloc-split">
+      <div class="center alloc-pill"><div class="pill">${round === 1 ? 'Round 1 · 40h week' : 'Round 2 · 32h week'} · ${r.name}</div></div>
 
-      <div class="budget" id="budget">
-        <span>Hours left today</span>
-        <span class="left-hrs" id="left">0.0h</span>
-      </div>
-      <div class="muted center" style="margin-top:-6px">
-        Meetings take ${meeting.toFixed(1)}h/day · you allocate ${budget.toFixed(1)}h/day × ${days} days
-      </div>
-
-      ${myTarget != null && myTarget > 0
-        ? `<div class="target-note">📣 Michael expects <strong>${myTarget.toFixed(1)}h/day</strong> of deep work from you (${(myTarget * days).toFixed(1)}h/week).</div>`
-        : ''}
-      <div class="target-note" style="background:var(--panel-2);border-color:var(--line)">
-        <strong>🎯 Team:</strong> deliver the orders without burning out. <strong>🏅 You:</strong> ${r.target}
-      </div>
-
-      <div class="stack" id="steppers"></div>
-
-      <div class="card stack">
-        <h3 style="margin:0">Your week at a glance</h3>
+      <!-- Top half: live "week at a glance" — stays pinned while you adjust below. -->
+      <div class="alloc-glance">
+        <div class="glance-head">
+          <h3 class="glance-title">📊 Your week at a glance</h3>
+          <div class="budget-mini" id="budget"><span>Left today</span><span class="left-hrs" id="left">0.0h</span></div>
+        </div>
         <div class="gauges" id="gauges"></div>
       </div>
 
-      <button id="lock" class="big" disabled>Lock in my week</button>
+      <!-- Bottom half: the schedule setters. -->
+      <div class="alloc-setters stack">
+        <div class="muted center" style="font-size:.9rem;margin-top:2px">
+          Meetings take ${meeting.toFixed(1)}h/day · you allocate ${budget.toFixed(1)}h/day × ${days} days, however you like.
+        </div>
+        ${myTarget != null && myTarget > 0
+          ? `<div class="target-note">📣 Michael expects <strong>${myTarget.toFixed(1)}h/day</strong> of deep work from you (${(myTarget * days).toFixed(1)}h/week).</div>`
+          : ''}
+        <div class="target-note" style="background:var(--panel-2);border-color:var(--line)">
+          <strong>🎯 Team:</strong> deliver the orders without burning out. <strong>🏅 You:</strong> ${r.target}
+        </div>
+
+        <div class="stack" id="steppers"></div>
+
+        <button id="lock" class="big" disabled>Lock in my week</button>
+      </div>
     </div>`
 
   // +/- steppers (one per category) — nicer than sliders on a phone.
@@ -645,6 +719,7 @@ async function renderResult(round) {
         <h2 style="margin:0">${r.name}</h2>
         <div class="title muted">${r.title}</div>
         <div><span class="badge ${me.medal ? 'win' : 'fail'}">${me.medal ? '🏅 ' + r.medalLabel : '— no medal'}</span></div>
+        <div class="medal-result muted">${me.medal ? '✅ Earned' : '❌ Missed'} · ${r.target}</div>
         <div class="pill">${me.summary.label}: ${me.summary.value}</div>
         ${me.carry > 0 ? `<div class="muted">🔋 +${Math.round(me.carry)} burnout carried from Round 1</div>` : ''}
       </div>
@@ -763,6 +838,8 @@ function openRoleModal() {
   backdrop.innerHTML = `
     <div class="modal-card stack" role="dialog" aria-modal="true">
       ${roleCardHTML(state.player.role)}
+      ${glossaryHTML()}
+      ${controlGuideHTML()}
       <button class="big ghost" data-close type="button">Close</button>
     </div>`
   backdrop.hidden = false
@@ -802,6 +879,12 @@ function gaugeColor(metric, value) {
 function setBusy(id, busy) {
   const b = document.getElementById(id)
   if (b) b.disabled = busy
+}
+
+// Clamp a stepped value into [min, max], rounding tiny float drift to the step grid.
+function clampStep(v, min, max) {
+  const snapped = Math.round(v * 2) / 2 // SLIDER_STEP = 0.5
+  return Math.max(min, Math.min(max, snapped))
 }
 
 let toastTimer

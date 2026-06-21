@@ -10,6 +10,9 @@ import {
   teamVerdict,
   TEAM_GOAL,
   ROUND_INTRO,
+  CONTROL_GUIDE,
+  GLOSSARY,
+  END_QUESTIONS,
   OUTPUT_FLOOR,
   BURNOUT_CAP,
 } from './game.js'
@@ -22,6 +25,7 @@ import {
   setPhase,
   subscribeRoom,
   subscribePlayers,
+  broadcastReset,
 } from './db.js'
 import { avatarSVG } from './avatars.js'
 import { sfx, resume as audioResume, toggleMuted, isMuted } from './audio.js'
@@ -75,12 +79,14 @@ function buildControls() {
   bar.innerHTML = `
     <button id="c-next" title="Advance (Space)">Next ▶</button>
     <button id="c-auto" class="ghost" title="Toggle auto-advance (A)">Auto: off</button>
-    <button id="c-mute" class="ghost" title="Mute (M)">🔊</button>`
+    <button id="c-mute" class="ghost" title="Mute (M)">🔊</button>
+    <button id="c-reset" class="ghost" title="Start a brand-new game — clears every device">🔄 New game</button>`
   document.body.appendChild(bar)
   bar.querySelector('#c-next').onclick = () => {
     audioResume()
     advance()
   }
+  bar.querySelector('#c-reset').onclick = newGame
   bar.querySelector('#c-auto').onclick = () => {
     audioResume()
     state.autoAdvance = !state.autoAdvance
@@ -101,6 +107,21 @@ function updateControls() {
   if (a) a.textContent = 'Auto: ' + (state.autoAdvance ? 'on' : 'off')
   const m = document.getElementById('c-mute')
   if (m) m.textContent = isMuted() ? '🔇' : '🔊'
+}
+
+// Start a brand-new game: tell every connected phone to wipe its saved session
+// (so nobody resumes the old room), clear our own stored room, then reload into a
+// fresh room with a new join code.
+async function newGame() {
+  if (!confirm('Start a brand-new game?\n\nThis clears the saved session on every connected phone and big screen, and makes a fresh room code.')) return
+  try {
+    await broadcastReset(state.room.id)
+  } catch (e) {
+    console.error(e)
+  }
+  localStorage.removeItem(STORE_KEY)
+  // Drop any ?code= in the URL so the reload creates a brand-new room.
+  location.href = location.pathname
 }
 
 function subscribe() {
@@ -305,12 +326,33 @@ function renderIntro(round) {
         <div class="tg-title">🎯 ${TEAM_GOAL.title}</div>
         <div class="tg-line">${TEAM_GOAL.output} ${TEAM_GOAL.wellbeing}</div>
       </div>
+      ${round === 1 ? controlsExplainHTML() : ''}
       <p class="muted" style="font-size:1.3rem;margin-top:2vh">${
         round === 1 ? 'Michael is setting meetings and deep-work targets' : 'Michael is trimming meetings and targets'
       }<span class="dots"></span></p>
     </div>`,
     'Waiting for Michael…'
   )
+}
+
+// "How the game works" panel shown on the big screen before play starts: the
+// three numbers everyone steers, and how each control moves the dials.
+function controlsExplainHTML() {
+  const numbers = GLOSSARY.map(
+    (g) => `<div class="num-chip"><div class="num-term">${g.emoji} ${g.term}</div><div class="num-short">${g.short}</div></div>`
+  ).join('')
+  const controls = CONTROL_GUIDE.controls
+    .map(
+      (c) => `<div class="cg-chip"><div class="cg-chip-label">${c.emoji} ${c.label}</div><div class="cg-chip-dials">${c.dials}</div></div>`
+    )
+    .join('')
+  return `
+    <div class="screen-explain">
+      <h2 class="explain-h">🎚️ The three numbers you’re steering</h2>
+      <div class="num-grid">${numbers}</div>
+      <h2 class="explain-h">📖 How each control moves the dials</h2>
+      <div class="cg-grid">${controls}</div>
+    </div>`
 }
 
 // ---------------------------------------------------------------------------
@@ -403,6 +445,8 @@ async function buildRevealSlides(round, isFinal) {
       r1: evals1.company,
       r2: evalRound.company,
     })
+    // Presentation-style discussion prompts — one per Next press to close the game.
+    for (const q of END_QUESTIONS) slides.push({ type: 'question', q })
   }
   return slides
 }
@@ -475,6 +519,11 @@ function renderSlide() {
   if (slide.type === 'debrief') {
     stage(debriefHtml(slide), hint)
     if (newSlide && slide.v2.win) confetti()
+    return
+  }
+  if (slide.type === 'question') {
+    stage(questionHtml(slide), last ? 'That’s a wrap 🎬 — thanks for playing!' : `${SPACE_HINT} for the next question`)
+    if (newSlide) sfx.tick()
     return
   }
 }
@@ -579,6 +628,10 @@ function playerCardHtml(slide) {
           <div class="title">${r.title} · ${escapeHtml(playerName(res.role))}</div>
         </div>
         <span class="badge ${res.medal ? 'win' : 'fail'}">${res.medal ? '🏅 ' + r.medalLabel : '— no medal'}</span>
+      </div>
+      <div class="medal-line ${res.medal ? 'earned' : 'missed'}">
+        <strong>${res.medal ? '🏅 Medal earned' : '— Medal missed'}:</strong> ${r.medalLabel} — needed ${r.target}.
+        <span class="muted">Personal goal — doesn’t change the team result.</span>
       </div>
       <div class="reveal-grid">
         <div>
@@ -704,6 +757,18 @@ function debriefHtml(slide) {
       <h1 class="verdict-headline ${v2.win ? 'win' : 'fail'}">${v2.win ? '🎉 ' : ''}${v2.headline}</h1>
       <p class="intro-body" style="max-width:60ch;margin:2vh auto 0">${lesson}</p>
       <p class="muted" style="font-size:1.4rem;margin-top:3vh">💬 What did you cut first — and would you keep the four-day week?</p>
+    </div>`
+}
+
+// A single full-screen discussion prompt (presentation style — Next per slide).
+function questionHtml(slide) {
+  const { n, q, sub } = slide.q
+  return `
+    <div class="question-slide">
+      <div class="q-num">Question ${n} / ${END_QUESTIONS.length}</div>
+      <h1 class="q-text">${q}</h1>
+      ${sub ? `<p class="q-sub">${sub}</p>` : ''}
+      <div class="q-dots">${END_QUESTIONS.map((_, i) => `<span class="${i === n - 1 ? 'on' : ''}"></span>`).join('')}</div>
     </div>`
 }
 

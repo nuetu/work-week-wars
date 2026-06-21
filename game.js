@@ -108,6 +108,70 @@ export const ROUND_INTRO = {
   },
 }
 
+// ---------------------------------------------------------------------------
+// Explainers — how the game works, surfaced before play and in the role overlay.
+// Pure data so both the phone (play.js) and big screen (screen.js) render it.
+// ---------------------------------------------------------------------------
+
+// The three shared "team" numbers everyone is steering (the headline axes).
+export const GLOSSARY = [
+  { term: 'Output', emoji: '📦', short: 'Did the orders ship? — only deep work vs targets counts',
+    desc: 'Did the orders ship? Driven ONLY by deep work measured against Michael’s targets, scaled by how productive you are. The team must clear the orders floor every round — corporate doesn’t shrink the order book just because you work fewer hours.' },
+  { term: 'Burnout', emoji: '🔋', short: 'Team strain — up with work, down with rest',
+    desc: 'Cumulative strain on the team. Pushed UP by deep work, meetings and admin; brought DOWN by rest. A brutal Round 1 even carries some fatigue into Round 2. Stay out of the red.' },
+  { term: 'Wellbeing', emoji: '💚', short: 'How the week felt — rest & learning lift it',
+    desc: 'How good the week actually felt. Lifted by rest and learning, dragged down by meetings and admin. The four-day week only “works” if wellbeing ends up HIGHER than your 40-hour baseline.' },
+]
+
+// How each control moves the dials — the "before you play" cause-and-effect guide.
+export const CONTROL_GUIDE = {
+  intro: 'Every weekday is 8 working hours. Michael skims some off the top for meetings; you split whatever’s left across four kinds of work. Nothing forces a minimum — you could rest the whole day — but the orders still have to ship, so the balance is the whole game.',
+  controls: [
+    { emoji: '📣', label: 'Meetings', who: 'Michael sets this, for everyone',
+      effect: 'Coordination time taken off the top of everyone’s day before they allocate. A little keeps the team aligned; too much eats focus hours, spikes stress and drags wellbeing down.',
+      dials: '↑ stress · ↓ wellbeing · fewer hours to allocate' },
+    { emoji: '🎯', label: 'Deep work', who: 'You choose',
+      effect: 'Focused, order-filling output — the only thing that moves company output toward the orders floor. High value, but each extra hour returns a bit less (diminishing returns) and pushes burnout up.',
+      dials: '↑↑ output · ↑ burnout' },
+    { emoji: '🗂️', label: 'Admin', who: 'You choose',
+      effect: 'Reactive upkeep: email, filing, logistics, logging orders. Necessary glue, but it ships no orders and it drains you — keep it lean.',
+      dials: '↑ burnout · ↓ wellbeing · no output' },
+    { emoji: '📚', label: 'Learning', who: 'You choose',
+      effect: 'Upskilling and development. Energising and lifts wellbeing, with a slow payoff to productivity — but it won’t lower today’s burnout.',
+      dials: '↑↑ wellbeing · slow ↑ productivity' },
+    { emoji: '☕', label: 'Rest', who: 'You choose',
+      effect: 'Breaks, buffer, recovery. The main way to bring burnout and stress down and wellbeing up — but rest hours aren’t output, so overdo it and the orders slip.',
+      dials: '↓↓ burnout · ↓↓ stress · ↑ wellbeing' },
+  ],
+  // Answers the two questions players actually ask at the table.
+  faqs: [
+    { q: 'Admin vs deep work — what’s the difference?',
+      a: 'Deep work fills orders; it’s the only thing corporate actually counts. Admin is the upkeep AROUND the work — email, filing, logging sales — necessary but it ships nothing. Even the output engine (Dwight) needs a little admin to process what he sells; the trap is letting admin crowd out focus.' },
+    { q: 'Learning vs rest — aren’t they both “time off”?',
+      a: 'Both feel good, but they’re not the same. Rest actively lowers today’s burnout and stress. Learning doesn’t recover you — it lifts wellbeing and slowly raises productivity. Rest heals; learning invests.' },
+    { q: 'Can someone really spend 7 hours resting?',
+      a: 'Yes — your only hard limit is the hours left after meetings, and you may split them however you like. But output comes only from deep work, so a rest-heavy week tanks the orders and the team misses the floor. The freedom (and the temptation) is the point.' },
+  ],
+}
+
+// Personal medals explained — flavour goals that never change the team result.
+export const MEDAL_NOTE = 'A medal is a personal bonus goal — bragging rights for nailing your own brief. It never overrides the team result: you can’t “win” by polishing your own numbers while the company tanks.'
+
+// Five thought-provoking discussion prompts shown one-per-screen at the very end
+// (presentation style — host hits Next for each).
+export const END_QUESTIONS = [
+  { n: 1, q: 'Same pay, four days — would you take it? What if it cost you 20% of your salary?',
+    sub: 'Most real-world trials kept pay flat. What would make the trade worth it for you?' },
+  { n: 2, q: 'To fit five days into four, what did you cut first — and what does that say about which work actually mattered?',
+    sub: 'Meetings? Admin? The “busy” work is usually first to go.' },
+  { n: 3, q: 'Who gains the most from a four-day week — and who might get left behind?',
+    sub: 'Parents and carers, shift and customer-facing roles, globally distributed teams…' },
+  { n: 4, q: 'If output held with fewer hours, where was that time going before?',
+    sub: 'Coordination overhead, context-switching, meetings — or slack capacity for the unexpected?' },
+  { n: 5, q: 'Could your real team run this experiment next month? What’s the ONE thing that would have to change first?',
+    sub: 'Be specific — a meeting, a metric, a manager, or a mindset.' },
+]
+
 // Team win thresholds (tuned in test/calibrate.mjs). Output is an absolute floor
 // both rounds (corporate doesn't shrink the order book); the wellbeing axis in R2
 // is judged RELATIVE to the round-1 baseline.
@@ -151,11 +215,17 @@ export function daysInRound(round) {
 // ---------------------------------------------------------------------------
 
 // Player-allocated categories (meetings are set by Michael, not here).
+// `desc` is shown under each stepper, so it spells out what the category IS and
+// which dials it moves — that's where players actually decide.
 export const CATEGORIES = [
-  { key: 'deep_work_hrs', short: 'deep', label: 'Deep work', desc: 'Focused output. The core productive block.', emoji: '🎯' },
-  { key: 'admin_hrs', short: 'admin', label: 'Admin', desc: 'Email, filing, logistics — necessary but draining.', emoji: '🗂️' },
-  { key: 'learning_hrs', short: 'learn', label: 'Learning', desc: 'Development, upskilling — energising, slow payoff.', emoji: '📚' },
-  { key: 'rest_hrs', short: 'rest', label: 'Rest', desc: 'Breaks, buffer, recovery, informal chat.', emoji: '☕' },
+  { key: 'deep_work_hrs', short: 'deep', label: 'Deep work', emoji: '🎯',
+    desc: 'Focused, order-filling output — the ONLY work that ships orders. ↑↑ output, but ↑ burnout.' },
+  { key: 'admin_hrs', short: 'admin', label: 'Admin', emoji: '🗂️',
+    desc: 'Email, filing, logistics, logging orders — necessary upkeep that ships nothing. Keep it lean: ↑ burnout, ↓ wellbeing.' },
+  { key: 'learning_hrs', short: 'learn', label: 'Learning', emoji: '📚',
+    desc: 'Upskilling & development. Energising: ↑↑ wellbeing and a slow ↑ to productivity — but it won’t lower today’s burnout.' },
+  { key: 'rest_hrs', short: 'rest', label: 'Rest', emoji: '☕',
+    desc: 'Breaks, buffer, recovery. The main way to bring burnout & stress DOWN and wellbeing UP — but rest isn’t output.' },
 ]
 
 export const METRICS = [
