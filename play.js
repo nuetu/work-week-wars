@@ -505,7 +505,7 @@ function renderAllocating() {
 
   app.innerHTML = `
     <div class="alloc-split">
-      <div class="center alloc-pill"><div class="pill">${round === 1 ? 'Round 1 · 40h week' : 'Round 2 · 32h week'} · ${r.name}</div></div>
+      <div class="center alloc-pill"><div class="pill">${round === 1 ? 'Round 1 · 40h week' : 'Round 2 · 32h week'} · ${r.name}</div>${roundDotsHTML(round)}</div>
 
       <!-- Top half: live "week at a glance" — stays pinned while you adjust below. -->
       <div class="alloc-glance">
@@ -514,6 +514,15 @@ function renderAllocating() {
           <div class="budget-mini" id="budget"><span>Left today</span><span class="left-hrs" id="left">0.0h</span></div>
         </div>
         <div class="gauges" id="gauges"></div>
+        ${myTarget != null && myTarget > 0
+          ? `<div class="orders-meter" id="orders">
+               <div class="orders-top"><span>📦 Orders you’re shipping</span><span class="orders-pct" id="orders-pct">0%</span></div>
+               <div class="orders-track"><div class="orders-fill" id="orders-fill"></div></div>
+               <div class="orders-hint" id="orders-hint"></div>
+             </div>`
+          : state.player.role === 'michael'
+            ? `<div class="orders-note muted">📦 You set the targets — your own deep work feeds output too.</div>`
+            : ''}
       </div>
 
       <!-- Bottom half: the schedule setters. -->
@@ -528,6 +537,7 @@ function renderAllocating() {
           <strong>🎯 Team:</strong> deliver the orders without burning out. <strong>🏅 You:</strong> ${r.target}
         </div>
 
+        <button id="preset" class="ghost preset-btn" type="button">✨ Start from a balanced day</button>
         <div class="stack" id="steppers"></div>
 
         <button id="lock" class="big" disabled>Lock in my week</button>
@@ -592,6 +602,25 @@ function renderAllocating() {
       fill.style.width = v + '%'
       fill.style.background = gaugeColor(m, v)
     })
+
+    // Live "orders you're shipping" — deep work delivered against Michael's target.
+    // This is the central lesson made visible: orders come only from deep work.
+    if (myTarget != null && myTarget > 0) {
+      const deepWeekly = (state.draft.deep_work_hrs || 0) * days
+      const targetWeekly = myTarget * days
+      const pct = Math.round(Math.min(deepWeekly / targetWeekly, 1) * 100)
+      const fill = document.getElementById('orders-fill')
+      fill.style.width = pct + '%'
+      fill.style.background = `hsl(${(pct / 100) * 125}, 65%, 48%)`
+      document.getElementById('orders-pct').textContent = pct + '%'
+      document.getElementById('orders-hint').textContent =
+        pct >= 100
+          ? '✅ Target met — your orders will ship.'
+          : pct === 0
+            ? '⚠️ No deep work yet — your orders won’t ship.'
+            : 'Add deep work to ship more of your orders.'
+    }
+
     lockBtn.disabled = total <= 0
   }
 
@@ -612,7 +641,25 @@ function renderAllocating() {
   })
   recompute()
 
+  // Foolproof onboarding: one tap fills a sensible balanced day scaled to the
+  // budget, so first-timers start from something reasonable instead of all-zero.
+  document.getElementById('preset').addEventListener('click', () => {
+    state.draft = balancedPreset(budget)
+    sfx.tick()
+    recompute()
+  })
+
   lockBtn.addEventListener('click', async () => {
+    // Warn before locking a schedule that won't ship the orders — the consequence
+    // is the lesson, but a nudge stops an accidental zero-output lock.
+    const deepDay = state.draft.deep_work_hrs || 0
+    const lowForTarget = myTarget != null && myTarget > 0 && deepDay * days < myTarget * days * 0.6
+    if (deepDay === 0 || lowForTarget) {
+      const ask = myTarget != null && myTarget > 0
+        ? `You've set ${deepDay.toFixed(1)}h/day of deep work — Michael asked for ${myTarget.toFixed(1)}h/day. Your orders may not ship.\n\nLock it in anyway?`
+        : `You've set ${deepDay.toFixed(1)}h/day of deep work, so you'll ship very few orders.\n\nLock it in anyway?`
+      if (!confirm(ask)) return
+    }
     audioResume()
     sfx.lock()
     setBusy('lock', true)
@@ -642,8 +689,22 @@ function renderLocked() {
     <div class="waiting-splash stack">
       <div class="avatar role-${state.player.role}">✅</div>
       <h2>Locked in!</h2>
+      ${roundDotsHTML(state.room.round)}
       <p class="muted">Waiting for the others…<br/>${lockedCount} / ${real.length} ready</p>
+      <button id="unlock" class="ghost" type="button">✏️ Change my answer</button>
     </div>`
+  document.getElementById('unlock').addEventListener('click', async () => {
+    setBusy('unlock', true)
+    try {
+      await setLock(state.player.id, state.room.round, false)
+      state.locked = false
+      render() // back to allocation with the previous draft preserved
+    } catch (e) {
+      console.error(e)
+      setBusy('unlock', false)
+      toast('Could not reopen — try again')
+    }
+  })
 }
 
 function renderSpectator() {
@@ -876,6 +937,12 @@ function gaugeColor(metric, value) {
   return `hsl(${hue}, 65%, 48%)`
 }
 
+// "Round 1 of 2 ●○" progress indicator, so players always know where they are.
+function roundDotsHTML(round) {
+  return `<div class="round-progress"><span>Round ${round} of 2</span>
+    <i class="${round >= 1 ? 'on' : ''}"></i><i class="${round >= 2 ? 'on' : ''}"></i></div>`
+}
+
 function setBusy(id, busy) {
   const b = document.getElementById(id)
   if (b) b.disabled = busy
@@ -885,6 +952,22 @@ function setBusy(id, busy) {
 function clampStep(v, min, max) {
   const snapped = Math.round(v * 2) / 2 // SLIDER_STEP = 0.5
   return Math.max(min, Math.min(max, snapped))
+}
+
+// A sensible balanced day (the deep/admin/learn/rest = 3/1/1/2 reference) scaled to
+// fit whatever budget is left after meetings, snapped to 0.5h. Rest absorbs the
+// remainder so the total never exceeds the budget.
+function balancedPreset(budget) {
+  const props = { deep_work_hrs: 3, admin_hrs: 1, learning_hrs: 1 }
+  const sum = 7 // 3 + 1 + 1 + 2 (rest handled as remainder)
+  const draft = { deep_work_hrs: 0, admin_hrs: 0, learning_hrs: 0, rest_hrs: 0 }
+  let allocated = 0
+  for (const k of Object.keys(props)) {
+    draft[k] = Math.round(((props[k] / sum) * budget) * 2) / 2
+    allocated += draft[k]
+  }
+  draft.rest_hrs = Math.max(0, Math.round((budget - allocated) * 2) / 2)
+  return draft
 }
 
 let toastTimer

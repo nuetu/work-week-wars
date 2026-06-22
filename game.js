@@ -293,7 +293,11 @@ const INFLUENCE = {
 const PROD_K = 22 // weekly-deep-hours half-saturation; lower = stronger diminishing returns
 const PROD_GAIN = 10 // scales the (diminished) deep contribution to productivity
 const FOCUS_R2 = 1.15 // each deep hour ~15% more productive in the focused 4-day week
-const RECOVERY_R2 = { burnout: -5, stress: -6, wellbeing: 7, productivity: 0 }
+// The extra day off helps a bit automatically — but only a bit. It is deliberately
+// NOT enough to "win" Round 2 by copying the Round-1 plan: a team has to actually
+// rebalance (trade admin/grind for rest, trim meetings) to end up healthier than
+// baseline. Tuned in test/calibrate.mjs so balanced-same loses while smart wins.
+const RECOVERY_R2 = { burnout: -3, stress: -4, wellbeing: 2, productivity: 0 }
 
 function deepProductivity(deepWeekly, round) {
   const focus = round === 2 ? FOCUS_R2 : 1

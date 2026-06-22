@@ -57,24 +57,30 @@ the company tanks.
 
 1. **Lobby** — players join; host presses Space to start (needs ≥2 players).
 2. **Intro + plan** — the big screen sets the scene (Dunder Mifflin, the week's brief, the
-   shared team goal) **and explains the model**: the three team numbers everyone is
-   steering (output / burnout / wellbeing) and how each control moves the dials. Meanwhile
-   Michael sets daily meeting hours and a deep‑work target per teammate (with the same
-   +/− steppers players use, plus a note on *why* he sets each). Everyone else sees the
-   intro, their role, a glossary and a how‑it‑works guide on their phone.
+   shared team goal) **and explains the model** via an auto‑rotating carousel: the three
+   team numbers everyone is steering (output / burnout / wellbeing) and how each control
+   moves the dials. Meanwhile Michael sets daily meeting hours and a deep‑work target per
+   teammate (with the same +/− steppers players use, plus a note on *why* he sets each).
+   Everyone else sees the intro, their role, a glossary and a how‑it‑works guide on their phone.
 3. **Allocate (Round 1, 40h)** — everyone splits their remaining daily hours across
    deep work / admin / learning / rest with **+/− steppers**, while a pinned
-   "your week at a glance" panel shows live burnout, stress, wellbeing and productivity
-   gauges. Lock in when ready.
+   "your week at a glance" panel shows live burnout, stress, wellbeing, productivity **and a
+   live "orders you're shipping" meter** (deep work vs Michael's target — the lesson made
+   visible). A one‑tap **"start from a balanced day"** preset scaffolds first‑timers, and you
+   can **"change my answer"** after locking (until the host reveals). Lock in when ready.
 4. **Reveal** — host steps through each character (schedule, metrics, personal medal), the
    company‑output gauge, then the **team verdict** (the round‑1 baseline result).
 5. **Round 2 (32h)** — Friday is struck off. Michael may only *reduce* meetings/targets.
-   Everyone re‑allocates from scratch.
-6. **Final** — reveal again, the **Round 2 team verdict** (judged vs the round‑1 baseline),
-   a Round 1 vs Round 2 comparison chart, a **data‑driven debrief** (the output /
-   burnout / wellbeing deltas, the verdict, and a tailored "what would've helped"), and
-   finally **five full‑screen discussion questions**, one per Space press — presentation
-   style, to run the closing conversation.
+   Everyone re‑allocates from scratch. The four‑day week has to be **earned**: just copying
+   your Round‑1 plan into four days no longer passes — the team must actually rebalance
+   (trim meetings, trade grind/admin for rest) to end up healthier than baseline.
+6. **Final** — opens with a **prediction beat** (the room votes, against its own 40‑hour
+   baseline, whether the four‑day week held the orders and left them healthier) *before*
+   any Round‑2 result is shown, so the verdict lands as a discovery. Then: reveal again, the
+   **Round 2 team verdict** (judged vs the round‑1 baseline), a Round 1 vs Round 2
+   comparison chart, a **data‑driven debrief** (the output / burnout / wellbeing deltas, the
+   verdict, and a tailored "what would've helped"), and finally **five full‑screen discussion
+   questions**, one per Space press — presentation style, to run the closing conversation.
 
 ## Hosting (Netlify / GitHub Pages)
 
@@ -156,11 +162,11 @@ logic, which the spec explicitly allows.
 | # | Question | Decision |
 |---|---|---|
 | 1 | Slider granularity | `0.5h` steps |
-| 2 | Company income during allocation | Hidden — shown only at reveal/final |
+| 2 | Company income during allocation | Team total hidden until reveal — but each player now sees a live **personal "orders you're shipping"** meter (their own deep work vs target), so the hours‑vs‑output tradeoff is felt in the moment |
 | 3 | Win/fail display | Shared **team verdict** (the headline) plus a per‑role **medal** badge + themed score |
 | 4 | Debrief | Built‑in, data‑driven debrief slide (R1→R2 deltas + a tailored takeaway) |
 | 6 | Phase advancement | Host advances manually with Space |
-| 7 | Metric calibration | Balanced 8h day = exactly 50 on all metrics; team thresholds (`OUTPUT_FLOOR`, `BURNOUT_CAP` in `game.js`) tuned in `test/calibrate.mjs` so a normal R1 passes, a panicked grind or slack‑off fails, and the four‑day week is winnable with smart play (verified 2p–5p) |
+| 7 | Metric calibration | Balanced 8h day = exactly 50 on all metrics; thresholds + the Round‑2 recovery (`OUTPUT_FLOOR`, `BURNOUT_CAP`, `RECOVERY_R2` in `game.js`) tuned in `test/calibrate.mjs` so a normal R1 passes, a panicked grind or slack‑off fails, **copying R1 into four days fails the "healthier" test**, and only a genuinely rebalanced four‑day week wins (verified 2p–5p) |
 | 8 | Target visibility | Players see their *own* deep‑work target during allocation |
 
 ### Metric model
@@ -179,12 +185,16 @@ on hours and the four‑day week (see `game.js`):
   week (less waste, tighter meetings), so a shorter week roughly *maintains* output
   instead of mechanically losing it.
 - **Round‑2 recovery + carryover** — the extra day off lowers baseline burnout/stress and
-  raises wellbeing (a downward shift, not a cap — you can still burn out by cramming),
-  while a brutal Round 1 carries residual fatigue into Round 2.
+  raises wellbeing a little (a downward shift, not a cap — you can still burn out by
+  cramming), while a brutal Round 1 carries residual fatigue into Round 2. The recovery is
+  deliberately **small**: it is *not* enough to win Round 2 by copying the Round‑1 plan, so
+  the win has to be earned by actually rebalancing the week.
 
-Result: a balanced 8h day scores exactly 50 across the board in Round 1, and the same
-shape in the four‑day Round 2 shows lower burnout/stress, higher wellbeing, and roughly
-equal output — the headline finding from real four‑day‑week trials.
+Result: a balanced 8h day scores exactly 50 across the board in Round 1. In the four‑day
+Round 2, simply repeating that shape lands *roughly level* (and loses on the "healthier"
+test); a team that trims meetings and trades grind/admin for rest keeps output up **and**
+ends up healthier — the headline finding from real four‑day‑week trials, earned rather than
+handed over.
 
 ### Team verdict
 
@@ -193,5 +203,7 @@ win/lose. The team's **output** (`company_output` — deep work delivered agains
 targets, averaged) must clear `OUTPUT_FLOOR` in both rounds. Round 1 also needs team
 burnout ≤ `BURNOUT_CAP` and records the **baseline**. Round 2 is judged *relative to that
 baseline*: hold output at the floor **and** end up healthier (burnout down **and**
-wellbeing up). `test/calibrate.mjs` simulates several team strategies to keep these
-thresholds honest.
+wellbeing up). Because the automatic Round‑2 recovery is small, **a team that just repeats
+its Round‑1 plan fails the "healthier" test** — the win has to come from real change.
+`test/calibrate.mjs` simulates several team strategies (smart, cram, slack, copy‑R1) to
+keep these thresholds honest.

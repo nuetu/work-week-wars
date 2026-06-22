@@ -1,25 +1,34 @@
 /* ===========================================================================
    Work Week Wars — shared styles
-   Dunder Mifflin meets Jackbox: dark game-show stage, vibrant character accents.
+   "Pencil & paper": ruled-notebook paper, graphite ink, hand-drawn boxes.
    =========================================================================== */
 
 :root {
-  --bg: #14181f;
-  --bg-2: #1c222c;
-  --panel: #232b37;
-  --panel-2: #2b3543;
-  --line: #38445a;
-  --text: #f2f5fa;
-  --muted: #9aa7bd;
-  --accent: #2f6fb3; /* Dunder Mifflin blue */
-  --accent-2: #4a90d9;
-  --good: #4caf72;
-  --bad: #e0573e;
-  --warn: #e2b03b;
+  /* paper + ink palette */
+  --bg: #efe7d2;        /* kraft notebook paper (carries the ruled lines) */
+  --bg-2: #e7dec6;
+  --panel: #fdfaf0;     /* index-card / sticky-note white */
+  --panel-2: #f1ead7;   /* inset wells (tracks, slider/stepper rows) */
+  --line: #4a4639;      /* graphite stroke — borders & rules drawn in pencil */
+  --text: #2b2a24;      /* graphite ink */
+  --muted: #76705e;     /* faded pencil */
+  --accent: #2f6fb3;    /* blue ballpoint pen */
+  --accent-2: #1d5390;  /* pressed-harder blue (links / hover) */
+  --good: #3f8a52;      /* green colour-pencil */
+  --bad: #c0392b;       /* red marking pen */
+  --warn: #cf9a2a;      /* yellow highlighter */
   --radius: 16px;
-  --shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+  --shadow: 0 6px 18px rgba(60, 50, 25, 0.16);
 
-  /* character accents */
+  /* ruled-paper background lines */
+  --rule: rgba(70, 105, 165, 0.14);  /* faint blue feint */
+  --margin: rgba(192, 57, 43, 0.35); /* red margin line */
+
+  /* hand-drawn fonts */
+  --font-body: 'Patrick Hand', 'Segoe Print', 'Comic Sans MS', cursive;
+  --font-display: 'Caveat', 'Patrick Hand', cursive;
+
+  /* character accents (coloured pencils) */
   --michael: #2f6fb3;
   --dwight: #9c7a2e;
   --pam: #c2603a;
@@ -39,9 +48,12 @@ body {
 }
 
 body {
-  font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  font-family: var(--font-body);
   color: var(--text);
-  background: radial-gradient(1200px 800px at 50% -10%, #223047 0%, var(--bg) 60%);
+  background-color: var(--bg);
+  background-image:
+    linear-gradient(90deg, transparent 38px, var(--margin) 38px, var(--margin) 40px, transparent 40px),
+    repeating-linear-gradient(var(--bg) 0, var(--bg) 31px, var(--rule) 31px, var(--rule) 32px);
   background-attachment: fixed;
   -webkit-font-smoothing: antialiased;
   line-height: 1.45;
@@ -50,9 +62,9 @@ body {
 h1,
 h2,
 h3 {
-  font-family: 'Archivo', 'Inter', sans-serif;
-  font-weight: 800;
-  letter-spacing: -0.01em;
+  font-family: var(--font-display);
+  font-weight: 700;
+  letter-spacing: 0;
   margin: 0 0 0.4em;
   line-height: 1.05;
 }
@@ -188,7 +200,7 @@ input[type='text']:focus {
   align-items: center;
 }
 .role-head .name {
-  font-family: 'Archivo', sans-serif;
+  font-family: var(--font-display);
   font-weight: 800;
   font-size: 1.4em;
 }
@@ -245,7 +257,7 @@ input[type='text']:focus {
   margin-top: 2px;
 }
 .slider-row .slider-hrs {
-  font-family: 'Archivo', sans-serif;
+  font-family: var(--font-display);
   font-weight: 800;
   font-size: 1.25em;
   font-variant-numeric: tabular-nums;
@@ -266,7 +278,7 @@ input[type='range'] {
   background: var(--panel-2);
 }
 .budget .left-hrs {
-  font-family: 'Archivo', sans-serif;
+  font-family: var(--font-display);
   font-size: 1.5em;
 }
 .budget.over {
@@ -279,19 +291,19 @@ input[type='range'] {
   align-items: center;
   gap: 8px;
   font-weight: 800;
-  font-family: 'Archivo', sans-serif;
+  font-family: var(--font-display);
   padding: 0.4em 0.9em;
   border-radius: 999px;
   font-size: 1.05em;
 }
 .badge.win {
   background: color-mix(in srgb, var(--good) 25%, transparent);
-  color: #aef0c4;
+  color: #2d6b3e;
   border: 2px solid var(--good);
 }
 .badge.fail {
   background: color-mix(in srgb, var(--bad) 25%, transparent);
-  color: #ffc2b5;
+  color: #a73225;
   border: 2px solid var(--bad);
 }
 
@@ -314,7 +326,7 @@ body.screen .stage-head {
   margin-bottom: 2vh;
 }
 body.screen .stage-head .brand {
-  font-family: 'Archivo', sans-serif;
+  font-family: var(--font-display);
   font-weight: 800;
   font-size: 1.4rem;
   letter-spacing: 0.02em;
@@ -350,13 +362,13 @@ body.screen .hint kbd {
   flex-wrap: wrap;
 }
 .joincode {
-  font-family: 'Archivo', sans-serif;
+  font-family: var(--font-display);
   font-weight: 800;
   font-size: clamp(4rem, 16vw, 12rem);
   letter-spacing: 0.08em;
   line-height: 1;
-  color: #fff;
-  text-shadow: 0 6px 0 rgba(0, 0, 0, 0.25);
+  color: var(--text);
+  text-shadow: 2px 2px 0 rgba(43, 42, 36, 0.15);
 }
 .joinurl {
   font-size: 1.5rem;
@@ -401,7 +413,7 @@ body.screen .hint kbd {
   font-size: 40px;
 }
 .player-tile .pname {
-  font-family: 'Archivo', sans-serif;
+  font-family: var(--font-display);
   font-weight: 800;
   font-size: 1.2rem;
 }
@@ -535,7 +547,7 @@ body.screen .hint kbd {
   transition: width 1.1s cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 .bigmeter-val {
-  font-family: 'Archivo', sans-serif;
+  font-family: var(--font-display);
   font-weight: 800;
   font-size: 3rem;
 }
@@ -556,7 +568,7 @@ body.screen .hint kbd {
   display: flex;
   align-items: center;
   justify-content: center;
-  font-family: 'Archivo', sans-serif;
+  font-family: var(--font-display);
   font-weight: 800;
   font-size: 1.6rem;
   position: relative;
@@ -938,10 +950,10 @@ footer.foot {
   margin: 1.5vh 0;
 }
 .verdict-headline.win {
-  color: #aef0c4;
+  color: #2d6b3e;
 }
 .verdict-headline.fail {
-  color: #ffc2b5;
+  color: #a73225;
 }
 .axes {
   display: grid;
@@ -996,7 +1008,7 @@ footer.foot {
   margin-bottom: 4px;
 }
 .delta {
-  font-family: 'Archivo', sans-serif;
+  font-family: var(--font-display);
   font-weight: 800;
   font-size: 1.6rem;
   font-variant-numeric: tabular-nums;
@@ -1165,7 +1177,7 @@ details.explain > :last-child {
   background: var(--panel-2);
 }
 .budget-mini .left-hrs {
-  font-family: 'Archivo', sans-serif;
+  font-family: var(--font-display);
   font-weight: 800;
   font-size: 1.25rem;
   color: var(--text);
@@ -1205,7 +1217,7 @@ details.explain > :last-child {
   text-align: left;
 }
 .num-term {
-  font-family: 'Archivo', sans-serif;
+  font-family: var(--font-display);
   font-weight: 800;
   font-size: 1.3rem;
 }
@@ -1267,7 +1279,7 @@ details.explain > :last-child {
   text-align: center;
 }
 .q-num {
-  font-family: 'Archivo', sans-serif;
+  font-family: var(--font-display);
   font-weight: 800;
   letter-spacing: 0.04em;
   text-transform: uppercase;
@@ -1307,9 +1319,183 @@ details.explain > :last-child {
 /* Big screen: distinct "New game" reset button in the host control bar. */
 .controls #c-reset {
   border-color: color-mix(in srgb, var(--bad) 60%, var(--line));
-  color: #ffc2b5;
+  color: #a73225;
 }
 .controls #c-reset:hover {
   border-color: var(--bad);
   background: color-mix(in srgb, var(--bad) 18%, transparent);
+}
+
+/* ===========================================================================
+   UX UPGRADES — live orders meter, balanced preset, round progress,
+   prediction beat, intro carousel
+   =========================================================================== */
+
+/* Phone: live "orders you're shipping" meter in the glance panel (the lesson). */
+.orders-meter {
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px dashed var(--line);
+}
+.orders-top {
+  display: flex;
+  justify-content: space-between;
+  font-weight: 800;
+  margin-bottom: 5px;
+}
+.orders-pct {
+  font-family: var(--font-display);
+  font-variant-numeric: tabular-nums;
+}
+.orders-track {
+  height: 18px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  overflow: hidden;
+}
+.orders-fill {
+  height: 100%;
+  width: 0;
+  border-radius: 999px;
+  transition: width 0.25s ease, background 0.25s ease;
+}
+.orders-hint {
+  font-size: 0.82rem;
+  color: var(--muted);
+  margin-top: 5px;
+}
+.orders-note {
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px dashed var(--line);
+  font-size: 0.88rem;
+}
+
+/* Phone: "start from a balanced day" preset button. */
+.preset-btn {
+  width: 100%;
+  font-size: 0.95rem;
+  padding: 0.6em 1em;
+}
+
+/* Round progress dots (phone + big screen). */
+.round-progress {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--muted);
+  letter-spacing: 0.02em;
+}
+.round-progress i {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--panel-2);
+  border: 2px solid var(--line);
+}
+.round-progress i.on {
+  background: var(--accent-2);
+  border-color: var(--accent-2);
+}
+.round-progress.big {
+  justify-content: center;
+  display: flex;
+  font-size: 1.2rem;
+  margin: 0 0 1.5vh;
+}
+.round-progress.big i {
+  width: 16px;
+  height: 16px;
+}
+
+/* Big screen: prediction beat before the Round-2 verdict. */
+.predict {
+  max-width: 60ch;
+  margin: 0 auto;
+  text-align: center;
+}
+.predict-qs {
+  display: grid;
+  gap: 14px;
+  max-width: 46ch;
+  margin: 3vh auto 0;
+}
+.pq {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  font-size: 1.5rem;
+  font-weight: 800;
+  padding: 16px 22px;
+  border-radius: 14px;
+  background: var(--panel-2);
+  border-left: 6px solid var(--accent-2);
+}
+.pq .muted {
+  font-weight: 700;
+}
+
+/* Big screen: auto-rotating intro carousel. */
+.intro-carousel {
+  position: relative;
+  min-height: 26vh;
+}
+.ic-panel {
+  display: none;
+}
+.ic-panel.on {
+  display: block;
+  animation: pop 0.4s ease;
+}
+.ic-dots {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+  margin-top: 2.4vh;
+}
+.ic-dots span {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--panel-2);
+  border: 2px solid var(--line);
+  transition: background 0.2s, border-color 0.2s;
+}
+.ic-dots span.on {
+  background: var(--accent-2);
+  border-color: var(--accent-2);
+}
+
+/* ===========================================================================
+   PENCIL & PAPER — hand-drawn boxes: wobbly ink outlines on the key surfaces
+   =========================================================================== */
+.card,
+.player-tile,
+.reveal-card,
+.team-verdict,
+.team-result,
+.modal-card,
+.day {
+  border-color: var(--line);
+  border-style: solid;
+  /* asymmetric corners read as a rectangle sketched by hand */
+  border-radius: 255px 15px 225px 15px / 15px 225px 15px 255px;
+}
+
+button,
+.btn,
+button.big,
+.pill {
+  border-radius: 15px 225px 15px 255px / 255px 15px 225px 15px;
+}
+
+/* QR code: a square sticker taped a touch crooked onto the page */
+#qrcode {
+  border: 2px solid var(--line);
+  transform: rotate(-1.5deg);
 }

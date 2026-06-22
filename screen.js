@@ -32,6 +32,7 @@ import { sfx, resume as audioResume, toggleMuted, isMuted } from './audio.js'
 
 const app = document.getElementById('app')
 const STORE_KEY = 'www_screen'
+let introTimer = null // auto-rotation for the pre-game intro carousel
 
 const state = {
   room: null,
@@ -146,6 +147,10 @@ function subscribe() {
 }
 
 async function onEnterPhase() {
+  if (introTimer) {
+    clearInterval(introTimer)
+    introTimer = null
+  }
   state.players = await getPlayers(state.room.id)
   state.revealIdx = 0
   state.slides = []
@@ -326,33 +331,57 @@ function renderIntro(round) {
         <div class="tg-title">🎯 ${TEAM_GOAL.title}</div>
         <div class="tg-line">${TEAM_GOAL.output} ${TEAM_GOAL.wellbeing}</div>
       </div>
-      ${round === 1 ? controlsExplainHTML() : ''}
+      ${round === 1 ? introCarouselHTML() : ''}
       <p class="muted" style="font-size:1.3rem;margin-top:2vh">${
         round === 1 ? 'Michael is setting meetings and deep-work targets' : 'Michael is trimming meetings and targets'
       }<span class="dots"></span></p>
     </div>`,
     'Waiting for Michael…'
   )
+  if (round === 1) startIntroCarousel()
 }
 
-// "How the game works" panel shown on the big screen before play starts: the
-// three numbers everyone steers, and how each control moves the dials.
-function controlsExplainHTML() {
+// Pre-game explainer, split into two slides that auto-rotate so it reads like a
+// presentation instead of a wall of text: the three numbers, then the controls.
+function numbersPanelHTML() {
   const numbers = GLOSSARY.map(
     (g) => `<div class="num-chip"><div class="num-term">${g.emoji} ${g.term}</div><div class="num-short">${g.short}</div></div>`
   ).join('')
+  return `<h2 class="explain-h">🎚️ The three numbers you’re steering</h2><div class="num-grid">${numbers}</div>`
+}
+function controlsPanelHTML() {
   const controls = CONTROL_GUIDE.controls
     .map(
       (c) => `<div class="cg-chip"><div class="cg-chip-label">${c.emoji} ${c.label}</div><div class="cg-chip-dials">${c.dials}</div></div>`
     )
     .join('')
+  return `<h2 class="explain-h">📖 How each control moves the dials</h2><div class="cg-grid">${controls}</div>`
+}
+function introCarouselHTML() {
   return `
-    <div class="screen-explain">
-      <h2 class="explain-h">🎚️ The three numbers you’re steering</h2>
-      <div class="num-grid">${numbers}</div>
-      <h2 class="explain-h">📖 How each control moves the dials</h2>
-      <div class="cg-grid">${controls}</div>
+    <div class="screen-explain intro-carousel" id="introCarousel">
+      <div class="ic-panel" data-panel="0">${numbersPanelHTML()}</div>
+      <div class="ic-panel" data-panel="1">${controlsPanelHTML()}</div>
+      <div class="ic-dots"><span></span><span></span></div>
     </div>`
+}
+function startIntroCarousel() {
+  if (introTimer) clearInterval(introTimer)
+  introTimer = null
+  const root = document.getElementById('introCarousel')
+  if (!root) return
+  const panels = root.querySelectorAll('.ic-panel')
+  const dots = root.querySelectorAll('.ic-dots span')
+  let i = 0
+  const show = (n) => {
+    panels.forEach((p, k) => p.classList.toggle('on', k === n))
+    dots.forEach((d, k) => d.classList.toggle('on', k === n))
+  }
+  show(0)
+  introTimer = setInterval(() => {
+    i = (i + 1) % panels.length
+    show(i)
+  }, 7000)
 }
 
 // ---------------------------------------------------------------------------
@@ -384,6 +413,7 @@ function renderAllocating() {
     : `${all ? 'Everyone’s ready — ' : ''}${SPACE_HINT} to reveal · ${auto}`
   stage(
     `<h1 class="center">${round === 1 ? 'Round 1 · 40-hour week' : 'Round 2 · 32-hour week'}</h1>
+     <div class="center round-progress big">Round ${round} of 2 <i class="${round >= 1 ? 'on' : ''}"></i><i class="${round >= 2 ? 'on' : ''}"></i></div>
      <p class="center muted" style="font-size:1.5rem">Allocating the week — ${lockedCount} / ${real.length} locked in</p>
      <div class="player-grid">${tiles}</div>`,
     hint
@@ -437,6 +467,9 @@ async function buildRevealSlides(round, isFinal) {
   slides.push({ type: 'team', round, verdict })
 
   if (isFinal) {
+    // Prediction beat FIRST, before any R2 result is shown: the room commits to a
+    // guess, so the verdict lands as a discovery rather than an announcement.
+    slides.unshift({ type: 'predict', baseline })
     slides.push({ type: 'compare', r1: evals1, r2: evalRound })
     slides.push({
       type: 'debrief',
@@ -515,6 +548,11 @@ function renderSlide() {
     }
     return
   }
+  if (slide.type === 'predict') {
+    stage(predictHtml(slide), hint)
+    if (newSlide) sfx.reveal()
+    return
+  }
   if (slide.type === 'compare') return stage(compareHtml(slide), hint)
   if (slide.type === 'debrief') {
     stage(debriefHtml(slide), hint)
@@ -555,7 +593,8 @@ function confetti() {
   cvs.height = innerHeight
   document.body.appendChild(cvs)
   const cx = cvs.getContext('2d')
-  const colors = ['#2f6fb3', '#4caf72', '#e2b03b', '#c2603a', '#3b8e8e', '#ffffff']
+  // coloured-pencil confetti (no white — it would vanish on the paper)
+  const colors = ['#2f6fb3', '#3f8a52', '#cf9a2a', '#c2603a', '#3b8e8e', '#c0392b']
   const parts = Array.from({ length: 150 }, () => ({
     x: innerWidth / 2 + (Math.random() - 0.5) * 240,
     y: innerHeight * 0.42,
@@ -757,6 +796,24 @@ function debriefHtml(slide) {
       <h1 class="verdict-headline ${v2.win ? 'win' : 'fail'}">${v2.win ? '🎉 ' : ''}${v2.headline}</h1>
       <p class="intro-body" style="max-width:60ch;margin:2vh auto 0">${lesson}</p>
       <p class="muted" style="font-size:1.4rem;margin-top:3vh">💬 What did you cut first — and would you keep the four-day week?</p>
+    </div>`
+}
+
+// Prediction beat shown before the Round-2 verdict: the team commits to a guess
+// against their own 40-hour baseline, so the result lands as a discovery.
+function predictHtml(slide) {
+  const b = slide.baseline
+  return `
+    <div class="predict">
+      <div class="pill">Before the verdict · vote out loud</div>
+      <h1 class="intro-title">Predict the four-day week</h1>
+      <p class="intro-body">Your 40-hour baseline was output <strong>${b.output}</strong> · burnout <strong>${b.burnout}</strong> · wellbeing <strong>${b.wellbeing}</strong>.
+        You just worked 32 hours. As a team, call it:</p>
+      <div class="predict-qs">
+        <div class="pq">📦 Same orders out the door?<span class="muted">Yes / No</span></div>
+        <div class="pq">💚 Team healthier than the 40-hour week?<span class="muted">Yes / No</span></div>
+      </div>
+      <p class="muted" style="font-size:1.3rem;margin-top:2vh">Commit to your guess — then hit Next to find out.</p>
     </div>`
 }
 
